@@ -1,0 +1,10 @@
+arm/.dep/
+*.bin
+*.elf
+*.lss
+*.map
+*.sym
+*.lst
+*.o
+sirfmemdump
+
