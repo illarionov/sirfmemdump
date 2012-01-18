@@ -1,5 +1,10 @@
 arm/.dep/
 *.bin
+!wince/sirfmemdump.bin
+wince/*.ncb
+wince/*.suo
+wince/*.user
+wince/Pocket*/
 *.elf
 *.lss
 *.map
