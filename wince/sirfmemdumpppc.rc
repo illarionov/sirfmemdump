@@ -1,0 +1,340 @@
+// Microsoft Visual C++ generated resource script.
+//
+#include "resourceppc.h"
+
+#define APSTUDIO_READONLY_SYMBOLS
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 2 resource.
+//
+#define APSTUDIO_HIDDEN_SYMBOLS
+#include "windows.h"
+#include "resdefce.h"
+#undef APSTUDIO_HIDDEN_SYMBOLS
+
+/////////////////////////////////////////////////////////////////////////////
+#undef APSTUDIO_READONLY_SYMBOLS
+
+/////////////////////////////////////////////////////////////////////////////
+// Neutral resources
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_NEU)
+#ifdef _WIN32
+LANGUAGE LANG_NEUTRAL, SUBLANG_NEUTRAL
+#pragma code_page(1251)
+#endif //_WIN32
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dialog
+//
+
+IDD_DUMP_MEM DIALOG  0, 0, 156, 179
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Dump Memory"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    CONTROL         "Dump to file",IDC_DUMP_TO_FILE,"Button",BS_AUTOCHECKBOX | BS_NOTIFY | WS_TABSTOP,8,14,54,10
+    CONTROL         "Dump to screen",IDC_DUMP_TO_SCREEN,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,74,14,66,10
+    EDITTEXT        IDC_DST_FILE,6,39,131,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_DST_FILE_PICKER,139,39,11,14,BS_CENTER
+    EDITTEXT        IDC_FROM_ADDR,29,73,49,14,ES_AUTOHSCROLL
+    EDITTEXT        IDC_TO_ADDR,96,73,48,14,ES_AUTOHSCROLL
+    CONTROL         "MID 131 dump",IDC_USE_MID131,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,6,113,63,10
+    COMBOBOX        IDC_CURRRENT_GPS_MODE,75,112,72,54,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "Cancel",IDCANCEL,39,136,50,14
+    DEFPUSHBUTTON   "Dump",IDOK,97,136,50,14
+    LTEXT           "Destination file",IDC_DST_FILE_STATIC,6,29,88,8
+    LTEXT           "Current GPS mode",IDC_STATIC,81,100,60,8
+    LTEXT           "From:",IDC_STATIC,9,75,20,8,SS_CENTERIMAGE
+    LTEXT           "To:",IDC_STATIC,82,75,12,8,SS_CENTERIMAGE
+    GROUPBOX        "Address",IDC_STATIC,2,62,151,31
+    GROUPBOX        "Destination",IDC_STATIC,2,0,151,60
+END
+
+IDD_MAIN DIALOG  0, 0, 156, 179
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_CAPTION | WS_SYSMENU
+CAPTION "Sirfmemdump"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    EDITTEXT        IDC_LOG,1,1,155,119,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_NOHIDESEL | WS_VSCROLL | WS_HSCROLL
+    LTEXT           "Not connected",IDC_STATS_COM_PORT,46,128,104,8
+    LTEXT           "Com-port:",IDC_STATIC,10,128,38,8
+    LTEXT           "Protocol:",IDC_STATIC,13,136,30,8
+    LTEXT           "Unknown",IDC_STATS_PROTO,46,136,104,8
+    LTEXT           "Received:",IDC_STATIC,9,144,33,8
+    LTEXT           "0",IDC_STATS_RECEIVED,46,144,40,8
+    LTEXT           "Errors:",IDC_STATIC,19,152,23,8
+    LTEXT           "0",IDC_STATS_ERRORS,46,152,31,8
+    LTEXT           "Sirf:",IDC_STATIC,97,144,14,8
+    LTEXT           "0",IDC_STATS_SIRF,115,144,35,8
+    LTEXT           "Nmea:",IDC_STATIC,88,152,22,8
+    LTEXT           "0",IDC_STATS_NMEA,115,152,35,8
+    GROUPBOX        "Statistics",IDC_STATIC,0,120,155,43
+END
+
+IDD_CHANGE_GPS_MODE DIALOG  0, 0, 156, 177
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Change GPS mode"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    COMBOBOX        IDC_CURRRENT_GPS_MODE,66,13,72,54,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Current GPS mode",IDC_STATIC,3,15,60,8
+    COMBOBOX        IDC_NEW_GPS_MODE,66,30,72,54,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Change to mode",IDC_STATIC,8,33,54,8
+    PUSHBUTTON      "Cancel",IDCANCEL,36,54,50,14
+    DEFPUSHBUTTON   "Change",IDOK,94,54,50,14
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// DESIGNINFO
+//
+
+#ifdef APSTUDIO_INVOKED
+GUIDELINES DESIGNINFO 
+BEGIN
+    IDD_DUMP_MEM, DIALOG
+    BEGIN
+        LEFTMARGIN, 2
+        RIGHTMARGIN, 153
+        TOPMARGIN, 7
+    END
+
+    IDD_MAIN, DIALOG
+    BEGIN
+        LEFTMARGIN, 1
+        TOPMARGIN, 1
+        BOTTOMMARGIN, 163
+    END
+
+    IDD_CHANGE_GPS_MODE, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 149
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 170
+    END
+END
+#endif    // APSTUDIO_INVOKED
+
+#endif    // Neutral resources
+/////////////////////////////////////////////////////////////////////////////
+
+
+/////////////////////////////////////////////////////////////////////////////
+// Russian resources
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_RUS)
+#ifdef _WIN32
+LANGUAGE LANG_RUSSIAN, SUBLANG_DEFAULT
+#pragma code_page(1251)
+#endif //_WIN32
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// LOADER
+//
+
+IDR_LOADER              LOADER                  "sirfmemdump.bin"
+#endif    // Russian resources
+/////////////////////////////////////////////////////////////////////////////
+
+
+/////////////////////////////////////////////////////////////////////////////
+// English (U.S.) resources
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
+#ifdef _WIN32
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+#pragma code_page(1252)
+#endif //_WIN32
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dialog
+//
+
+IDD_ABOUTBOX DIALOG  0, 0, 156, 129
+STYLE DS_SETFONT | WS_POPUP | WS_CAPTION
+EXSTYLE 0x80000000L
+CAPTION "About sirfmemdump"
+FONT 8, "MS Sans Serif"
+BEGIN
+    ICON            IDI_SIRFMEMDUMP,IDC_STATIC_1,12,12,20,20,SS_REALSIZEIMAGE
+    LTEXT           "Sirfmemdump",IDC_STATIC,16,34,50,8
+    LTEXT           "v0.0",IDC_VERSION,66,34,42,8
+    LTEXT           "Copyright (c) 2012 Alexey Illarionov",IDC_STATIC,16,45,134,8
+    EDITTEXT        IDC_HOMEPAGE,4,63,146,12,ES_MULTILINE | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER
+END
+
+IDD_SELECT_COM_PORT DIALOG  0, 0, 156, 179
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Select COM port"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    COMBOBOX        IDC_COM_PORT,37,6,115,108,CBS_DROPDOWN | CBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Port",IDC_COM_PORT_TEXT,5,8,14,8
+    PUSHBUTTON      "Connect",IDC_BUTTON_OPEN_COM_PORT,35,43,50,14
+    COMBOBOX        IDC_BAUDRATE,37,23,69,97,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Baudrate",IDC_COM_PORT_TEXT,4,25,30,8
+    PUSHBUTTON      "Disconnect",IDC_BUTTON_CLOSE_COM_PORT,93,43,50,14,WS_DISABLED
+    PUSHBUTTON      "Done",IDOK,35,67,50,14
+    LTEXT           "Not connected",IDC_STATS_COM_PORT,46,98,104,8
+    LTEXT           "Com-port:",IDC_COM_PORT_TEXT,10,98,38,8
+    LTEXT           "Protocol:",IDC_COM_PORT_TEXT,13,106,30,8
+    LTEXT           "Unknown",IDC_STATS_PROTO,46,106,104,8
+    LTEXT           "Received:",IDC_COM_PORT_TEXT,9,114,33,8
+    LTEXT           "0",IDC_STATS_RECEIVED,46,114,40,8
+    LTEXT           "Errors:",IDC_COM_PORT_TEXT,19,122,23,8
+    LTEXT           "0",IDC_STATS_ERRORS,46,122,31,8
+    LTEXT           "Sirf:",IDC_COM_PORT_TEXT,97,114,14,8
+    LTEXT           "0",IDC_STATS_SIRF,115,114,35,8
+    LTEXT           "Nmea:",IDC_COM_PORT_TEXT,88,122,22,8
+    LTEXT           "0",IDC_STATS_NMEA,115,122,35,8
+    GROUPBOX        "Statistics",IDC_COM_PORT_TEXT,0,90,155,43
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// DESIGNINFO
+//
+
+#ifdef APSTUDIO_INVOKED
+GUIDELINES DESIGNINFO 
+BEGIN
+    IDD_ABOUTBOX, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 148
+        VERTGUIDE, 54
+        VERTGUIDE, 154
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 122
+    END
+
+    IDD_SELECT_COM_PORT, DIALOG
+    BEGIN
+        LEFTMARGIN, 4
+        RIGHTMARGIN, 152
+    END
+END
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Icon
+//
+
+// Icon with lowest ID value placed first to ensure application icon
+// remains consistent on all systems.
+IDI_SIRFMEMDUMP         ICON                    "sirfmemdump.ico"
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Menu
+//
+
+IDR_MENU MENU 
+BEGIN
+    MENUITEM "COM",                         IDM_COM_PORT
+    POPUP "Menu"
+    BEGIN
+        MENUITEM "Dump memory",                 IDM_DUMP_MEM
+        MENUITEM SEPARATOR
+        MENUITEM "Change GPS mode",             IDM_CHANGE_GPS_MODE
+        MENUITEM SEPARATOR
+        MENUITEM "About",                       IDM_HELP_ABOUT
+        MENUITEM "Exit",                        IDCANCEL
+    END
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Accelerator
+//
+
+IDC_SIRFMEMDUMP ACCELERATORS 
+BEGIN
+    "A",            IDM_HELP_ABOUT,         VIRTKEY, CONTROL, NOINVERT
+    "Q",            IDM_OK,                 VIRTKEY, CONTROL, NOINVERT
+END
+
+
+#ifdef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// TEXTINCLUDE
+//
+
+1 TEXTINCLUDE 
+BEGIN
+    "resourceppc.h\0"
+END
+
+2 TEXTINCLUDE 
+BEGIN
+    "#define APSTUDIO_HIDDEN_SYMBOLS\r\n"
+    "#include ""windows.h""\r\n"
+    "#include ""resdefce.h""\r\n"
+    "#undef APSTUDIO_HIDDEN_SYMBOLS\r\n"
+    "\0"
+END
+
+3 TEXTINCLUDE 
+BEGIN
+    "\r\n"
+    "#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)\r\n"
+    "LANGUAGE 9, 1\r\n"
+    "#pragma code_page(1251)\r\n"
+    "#include ""sirfmemdumpppc.rc2""  // non-Microsoft Visual C++ edited resources\r\n"
+    "#endif\r\n"
+    "\0"
+END
+
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// String Table
+//
+
+STRINGTABLE 
+BEGIN
+    IDS_APP_TITLE           "sirfmemdump"
+    IDS_MENU                "Menu"
+END
+
+STRINGTABLE 
+BEGIN
+    IDS_OK                  "OK"
+    IDS_HELP                "HELP"
+    IDS_HELP_ABOUT          "About"
+    IDS_COM_PORT            "COM"
+END
+
+#endif    // English (U.S.) resources
+/////////////////////////////////////////////////////////////////////////////
+
+
+
+#ifndef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 3 resource.
+//
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
+LANGUAGE 9, 1
+#pragma code_page(1251)
+#include "sirfmemdumpppc.rc2"  // non-Microsoft Visual C++ edited resources
+#endif
+
+/////////////////////////////////////////////////////////////////////////////
+#endif    // not APSTUDIO_INVOKED
+
