@@ -96,6 +96,43 @@ int main(void)
 		     write_cmd_response(MDPROTO_CMD_MEM_READ_RESPONSE, (void *)from, to-from+1);
 	       }
 	       break;
+	    case MDPROTO_CMD_EXEC_CODE:
+	       if (MDPROTO_CMD_SIZE(buf) != 5*4+1)
+		  status = MDPROTO_STATUS_WRONG_PARAM;
+	       else {
+		  unsigned i;
+		  uint32_t f_p;
+		  union {
+		     uint8_t u8[4*4];
+		     uint32_t u32[4];
+		  } src;
+		  uint32_t dst[4];
+
+		  f_p = (buf.data.p[1] << 24)
+		     | (buf.data.p[2] << 16)
+		     | (buf.data.p[3] << 8)
+		     | (buf.data.p[4]);
+
+		  for(i=0; i<4*4; i++)
+		     src.u8[i] = buf.data.p[5+i];
+		  dst[0] = 0xdeadc0de;
+		  dst[1] = 0xdeadc0de;
+		  dst[2] = 0xdeadc0de;
+		  dst[3] = 0xdeadc0de;
+
+		  asm volatile(
+			"LDMIA %[src]!, {R0-R3} \n\t"
+			"MOV LR, PC \n\t"
+			"BX %[f_p] \n\t"
+			"STMIA %[dst]!, {R0-R3} \n\t"
+			:
+			: [f_p]"r"(f_p), [src]"r"(&src.u8), [dst]"r"(&dst[0])
+			: "memory", "r0", "r1", "r2", "r3", "lr"
+			);
+
+		  write_cmd_response(MDPROTO_CMD_EXEC_CODE_RESPONSE, (void *)&dst[0], sizeof(dst));
+	       }
+	       break;
 	    default:
 	       status = MDPROTO_STATUS_WRONG_CMD;
 	       break;

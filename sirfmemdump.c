@@ -88,6 +88,10 @@ static void help(void)
    "    -v,            Verbosity level \n"
    "    -h,            Help\n"
    "    -V,            Show version\n"
+   "\nCommands:\n"
+   "    ping                                 Ping loader\n"
+   "    dump {src_addr} {dst_addr}           Dump memory\n"
+   "    exec {f_addr} {R0} {R1} {R2} {R4}    Execute function f_addr\n"
    "\n"
  );
  return;
@@ -408,6 +412,68 @@ int cmd_ping(int pfd)
   return 0;
 }
 
+int cmd_exec(int pfd, unsigned f_addr, unsigned r0, unsigned r1, unsigned r2, unsigned r3)
+{
+  unsigned read_status;
+  int write_size;
+  struct mdproto_cmd_buf_t cmd;
+  struct {
+     uint32_t f_addr;
+     uint32_t r0;
+     uint32_t r1;
+     uint32_t r2;
+     uint32_t r3;
+  } __attribute__((packed)) req;
+
+  struct resp_t {
+     uint32_t r0;
+     uint32_t r1;
+     uint32_t r2;
+     uint32_t r3;
+  } *resp;
+
+  req.f_addr = htonl(f_addr);
+  /* XXX: byteorder */
+  req.r0 = r0;
+  req.r1 = r1;
+  req.r2 = r2;
+  req.r3 = r3;
+
+  write_size = mdproto_pkt_init(&cmd, MDPROTO_CMD_EXEC_CODE, &req, sizeof(req));
+  gpsd_report(LOG_PROG, "EXECUTE...\n");
+
+  tcflush(pfd, TCIOFLUSH);
+  if (write(pfd, (void *)&cmd, write_size) < write_size) {
+     gpsd_report(LOG_PROG, "write() error\n");
+     return 1;
+  }
+
+  read_status = read_mdproto_pkt(pfd, &cmd);
+  if (read_status != MDPROTO_STATUS_OK) {
+     gpsd_report(LOG_PROG, "read_mdproto_pkt() error `%c`\n", read_status);
+     return 1;
+  }
+
+  if (cmd.data.id != MDPROTO_CMD_EXEC_CODE_RESPONSE) {
+     gpsd_report(LOG_PROG, "received wrong response code `0x%x`\n", cmd.data.id);
+     return 1;
+  }
+  if (ntohs(cmd.size) != 4*4+1) {
+     gpsd_report(LOG_PROG, "received wrong response size `0x%x`\n", ntohs(cmd.size));
+     return 1;
+  }
+  resp = (struct resp_t *)&cmd.data.p[1];
+
+  /* XXX: byteorder  */
+  gpsd_report(LOG_PROG, "R0: %08x R1: %08x R2: %08x R3: %08x\n",
+	(unsigned)resp->r0,
+	(unsigned)resp->r1,
+	(unsigned)resp->r2,
+	(unsigned)resp->r3
+	);
+  return 0;
+}
+
 
 int cmd_dump(int pfd, unsigned src_addr, unsigned dst_addr)
 {
@@ -547,6 +613,49 @@ main(int argc, char **argv){
 	      if (res != 0)
 		 break;
 	      argnum += 3;
+	   }else if (strcasecmp(argv[argnum], "exec") == 0) {
+	      unsigned i;
+	      unsigned f_addr;
+	      unsigned r[4];
+	      char *endptr;
+	      unsigned long tmp;
+	      unsigned i_err;
+
+	      if ((argc < 6)
+		    || (*argv[argnum+1]=='\0')
+		    || (*argv[argnum+2]=='\0')
+		    || (*argv[argnum+3]=='\0')
+		    || (*argv[argnum+4]=='\0')
+		    || (*argv[argnum+5]=='\0') ) {
+		 gpsd_report(LOG_ERROR, "f_addr/r0/r1/r2/r3 not defined\n");
+		 break;
+	      }
+
+	      tmp = strtoul(argv[argnum+1], &endptr, 0);
+	      if (*endptr != '\0') {
+		 gpsd_report(LOG_ERROR, "malformed %s `%s`\n", "f_addr", argv[argc+1]);
+		 break;
+	      }
+	      f_addr = (unsigned)tmp;
+
+	      i_err=0;
+	      for (i=0; i<4; i++) {
+		 tmp = strtoul(argv[argnum+2+i], &endptr, 0);
+		 if (*endptr != '\0') {
+		    gpsd_report(LOG_ERROR, "malformed r%u `%s`\n", i, argv[argc+2+i]);
+		    i_err=1;
+		    break;
+		 }
+		 r[i] = (unsigned)tmp;
+	      }
+	      if (i_err)
+		 break;
+
+	      res = cmd_exec(pfd, f_addr, r[0], r[1], r[2], r[3]);
+	      if (res != 0)
+		 break;
+
+	      argnum += 6;
 	   }else {
 	      gpsd_report(LOG_ERROR, "unknown command `%s`\n", argv[argnum]);
 	      break;

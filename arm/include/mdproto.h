@@ -24,6 +24,8 @@ enum mdproto_cmd_t {
    MDPROTO_CMD_PING_RESPONSE      ='Z',
    MDPROTO_CMD_MEM_READ           ='x',
    MDPROTO_CMD_MEM_READ_RESPONSE  ='X',
+   MDPROTO_CMD_EXEC_CODE          ='y',
+   MDPROTO_CMD_EXEC_CODE_RESPONSE ='Y',
 
    MDPROTO_STATUS_OK = '+',
    MDPROTO_STATUS_WRONG_CMD = '?',

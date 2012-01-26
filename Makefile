@@ -1,6 +1,6 @@
 CC?=gcc
-CFLAGS?= -O2 -s -pipe
-#CFLAGS= -W  -Wall -g -O0
+#CFLAGS?= -O2 -s -pipe
+CFLAGS= -W  -Wall -g -O0
 CFLAGS+= -Iarm/include
 
 DESTDIR?=/usr/local
