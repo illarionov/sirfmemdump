@@ -56,6 +56,10 @@ int write_cmd_response(uint8_t cmd_id, void *data, size_t data_size);
 
 static struct mdproto_cmd_buf_t buf;
 
+/* flash.c  */
+int flash_get_info(struct mdproto_cmd_flash_info_t *dst);
+
+
 int main(void)
 {
    uint8_t status;
@@ -131,6 +135,13 @@ int main(void)
 			);
 
 		  write_cmd_response(MDPROTO_CMD_EXEC_CODE_RESPONSE, (void *)&dst[0], sizeof(dst));
+	       }
+	       break;
+	    case MDPROTO_CMD_FLASH_INFO:
+	       {
+		  struct mdproto_cmd_flash_info_t response;
+		  flash_get_info(&response);
+		  write_cmd_response(MDPROTO_CMD_FLASH_INFO_RESPONSE, (void *)&response, sizeof(response));
 	       }
 	       break;
 	    default:

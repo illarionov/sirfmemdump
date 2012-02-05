@@ -26,6 +26,8 @@ enum mdproto_cmd_t {
    MDPROTO_CMD_MEM_READ_RESPONSE  ='X',
    MDPROTO_CMD_EXEC_CODE          ='y',
    MDPROTO_CMD_EXEC_CODE_RESPONSE ='Y',
+   MDPROTO_CMD_FLASH_INFO         ='w',
+   MDPROTO_CMD_FLASH_INFO_RESPONSE ='W',
 
    MDPROTO_STATUS_OK = '+',
    MDPROTO_STATUS_WRONG_CMD = '?',
@@ -46,6 +48,22 @@ struct mdproto_cmd_buf_t {
 } __attribute__((packed));
 #define MDPROTO_CMD_SIZE(_p) ((((_p).size << 8) | (((_p).size >> 8) & 0xff)) & 0xffff)
 #define MDPROTO_CMD_MAX_RAW_DATA_SIZE 508
+
+struct mdproto_cmd_flash_info_t {
+
+   /* software id. cmd 90h  */
+   uint16_t manuf_id;
+   uint16_t device_id;
+
+   /* cfi query. cmd 98h  */
+   /* 10 - 1a  */
+   uint16_t cfi_query_id_data[11];
+   /* 1b - 26  */
+   uint16_t sys_int_info[12];
+   /* 27 - 34 */
+   uint16_t dev_geometry[14];
+} __attribute__((packed, aligned(__alignof__(uint16_t))));
+
 
 int mdproto_pkt_init(struct mdproto_cmd_buf_t *buf,
       unsigned cmd_id,

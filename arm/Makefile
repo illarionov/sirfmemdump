@@ -33,7 +33,7 @@ SRC  = src/$(TARGET).c
 
 # List C source files here which must be compiled in ARM-Mode.
 # use file-extension c for "c-only"-files
-SRCARM  = src/uart.c src/mdproto.c
+SRCARM  = src/uart.c src/mdproto.c src/flash.c
 
 # List C++ source files here.
 # use file-extension cpp for C++-files (use extension .cpp)
