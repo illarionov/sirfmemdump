@@ -20,6 +20,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
@@ -45,7 +46,9 @@ const char *revision = "$Revision: 0.0 $";
 static int verbosity = 3;
 
 
-ssize_t read_full(int d, void *buf, size_t nbytes);
+static ssize_t read_full(int d, void *buf, size_t nbytes);
+
+static int dump_flash_info(const struct mdproto_cmd_flash_info_t *data);
 
 void gpsd_report(int errlevel, const char *fmt, ... )
 /* assemble command in printf(3) style, use stderr or syslog */
@@ -66,7 +69,7 @@ void gpsd_report(int errlevel, const char *fmt, ... )
 
 static void
 usage(void){
-   fprintf(stderr, "Usage: %s [-v d] [-l <loader_file>] [ -p tty ] [-n] [[ping] [dump {src_addr} {dst_addr}]\n", progname);
+   fprintf(stderr, "Usage: %s [-v d] [-l <loader_file>] [ -p tty ] [-n] command\n", progname);
 }
 
 static void version(void)
@@ -92,6 +95,7 @@ static void help(void)
    "    ping                                 Ping loader\n"
    "    dump {src_addr} {dst_addr}           Dump memory\n"
    "    exec {f_addr} {R0} {R1} {R2} {R4}    Execute function f_addr\n"
+   "    flash-info                           Print flash info\n"
    "\n"
  );
  return;
@@ -232,7 +236,7 @@ expect(int pfd, const char *str, size_t len, time_t timeout)
     }
 }
 
-ssize_t read_full(int d, void *buf, size_t nbytes)
+static ssize_t read_full(int d, void *buf, size_t nbytes)
 {
     size_t got = 0;
     ssize_t read_cnt;
@@ -522,6 +526,53 @@ int cmd_dump(int pfd, unsigned src_addr, unsigned dst_addr)
   return 0;
 }
 
+int cmd_flash_info(int pfd)
+{
+  unsigned read_status;
+  int write_size;
+  struct mdproto_cmd_buf_t cmd;
+
+  write_size = mdproto_pkt_init(&cmd, MDPROTO_CMD_FLASH_INFO, NULL, 0);
+  gpsd_report(LOG_PROG, "FLASH-INFO...\n");
+
+  tcflush(pfd, TCIOFLUSH);
+  usleep(10000);
+  if (write(pfd, (void *)&cmd, write_size) < write_size) {
+     gpsd_report(LOG_PROG, "write() error\n");
+     return 1;
+  }
+
+  read_status = read_mdproto_pkt(pfd, &cmd);
+  if (read_status != MDPROTO_STATUS_OK) {
+     gpsd_report(LOG_PROG, "read_mdproto_pkt() error `%c`\n", read_status);
+     return 1;
+  }
+
+  if (cmd.data.id != MDPROTO_CMD_FLASH_INFO_RESPONSE) {
+     gpsd_report(LOG_PROG, "received wrong response code `0x%x`\n", cmd.data.id);
+     return 1;
+  }
+
+  if (ntohs(cmd.size) != sizeof(struct mdproto_cmd_flash_info_t)+1) {
+     gpsd_report(LOG_PROG, "received wrong response size `0x%x`\n", ntohs(cmd.size));
+     return 1;
+  }
+
+
+  dump_flash_info((struct mdproto_cmd_flash_info_t *)&cmd.data.p[1]);
+
+  return 0;
+}
+
+static int dump_flash_info(const struct mdproto_cmd_flash_info_t *data)
+{
+   assert(data);
+   gpsd_report(LOG_PROG, "manufacturer: 0x%04x device id: 0x%04x\n", data->manuf_id,
+	data->device_id);
+
+   return 1;
+}
+
 
 int
 main(int argc, char **argv){
@@ -656,6 +707,11 @@ main(int argc, char **argv){
 		 break;
 
 	      argnum += 6;
+	   }else if (strcasecmp(argv[argnum], "flash-info") == 0) {
+	      argnum++;
+	      res = cmd_flash_info(pfd);
+	      if (res != 0)
+		 break;
 	   }else {
 	      gpsd_report(LOG_ERROR, "unknown command `%s`\n", argv[argnum]);
 	      break;
