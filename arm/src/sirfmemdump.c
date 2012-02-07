@@ -26,6 +26,7 @@
 static volatile uint32_t *UNK_20000020 = (uint32_t *)0x20000020;
 static volatile uint32_t *UNK_20000024 = (uint32_t *)0x20000024;
 
+static volatile uint16_t *UNK80010000   = (uint16_t *)0x80010000;
 static volatile uint16_t *RF_VERSION    = (uint16_t *)0x80010010;
 static volatile uint16_t *GPS_VERSION   = (uint16_t *)0x80010020;
 static volatile uint16_t *CLOCK_SELECT  = (uint16_t *)0x80010014;
@@ -57,14 +58,15 @@ int write_cmd_response(uint8_t cmd_id, void *data, size_t data_size);
 static struct mdproto_cmd_buf_t buf;
 
 /* flash.c  */
+int flash_init();
 int flash_get_info(struct mdproto_cmd_flash_info_t *dst);
-
 
 int main(void)
 {
    uint8_t status;
 
    init2();
+   flash_init();
    wait(1000);
    uart1_reset();
    uart1_write("+++", 3);
