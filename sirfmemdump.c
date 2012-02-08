@@ -50,6 +50,8 @@ static int verbosity = 3;
 static ssize_t read_full(int d, void *buf, size_t nbytes);
 
 static int dump_flash_info(const struct mdproto_cmd_flash_info_t *data);
+static void flash_get_name(unsigned manufacturer_id, unsigned device_id,
+      const char **manufacturer, const char **device);
 
 void gpsd_report(int errlevel, const char *fmt, ... )
 /* assemble command in printf(3) style, use stderr or syslog */
@@ -565,10 +567,115 @@ int cmd_flash_info(int pfd)
   return 0;
 }
 
+static void flash_get_name(unsigned manufacturer_id, unsigned device_id,
+      const char **manufacturer, const char **device)
+{
+   assert(manufacturer);
+   assert(device);
+
+   *manufacturer = "Unknown";
+   *device = "Unknown";
+
+   switch (manufacturer_id) {
+      case 0x01:
+	 *manufacturer = "AMD";
+	 switch (device_id) {
+	    default: break;
+	 }
+	 break;
+      case 0x04:
+	 *manufacturer = "Fujitsu";
+	 switch (device_id) {
+	    default: break;
+	 }
+      case 0x37:
+	 *manufacturer = "Amic";
+	 switch (device_id) {
+	    default: break;
+	 }
+	 break;
+      case 0x16f:
+	 *manufacturer = "Atmel";
+	 switch (device_id) {
+	    default: break;
+	 }
+	 break;
+      case 0x7f:
+	 *manufacturer = "EON";
+	 switch (device_id) {
+	    default: break;
+	 }
+	 break;
+      case 0x89:
+	 *manufacturer = "Intel";
+	 switch (device_id) {
+	    case 0x8890: *device ="28F160B3T"; break;
+	    case 0x8891: *device ="28F160B3B"; break;
+	    case 0x8892: *device ="28F800B3T"; break;
+	    case 0x8893: *device ="28F800B3B"; break;
+	    case 0x88c0: *device ="28F800C3T"; break;
+	    case 0x88c1: *device ="28F800C3B"; break;
+	    case 0x88c2: *device ="28F160C3T"; break;
+	    case 0x88c3: *device ="28F160C3B"; break;
+	    default: break;
+	 }
+	 break;
+      case 0xc2:
+      case 0x1c:
+	 *manufacturer = "Macronix";
+	 switch (device_id) {
+	    default: break;
+	 }
+	 break;
+      case 0x62:
+	 *manufacturer = "Sanyo";
+	 switch (device_id) {
+	    default: break;
+	 }
+	 break;
+      case 0xb0:
+	 *manufacturer = "Sharp";
+	 switch (device_id) {
+	    default: break;
+	 }
+	 break;
+      case 0xbf:
+	 *manufacturer = "SST";
+	 switch (device_id) {
+	    case 0x234a: *device = "SST39VF1602"; break;
+	    case 0x234b: *device = "SST39VF1601"; break;
+	    case 0x272f: *device = "SST39WF400A"; break;
+	    case 0x273f: *device = "SST39WF800A"; break;
+	    case 0x2780: *device = "SST39VF400A"; break;
+	    case 0x2781: *device = "SST39VF800"; break;
+	    case 0x2782: *device = "SST39VF160"; break;
+	    default: break;
+	 }
+	 break;
+      case 0x20:
+	 *manufacturer = "ST";
+	 switch (device_id) {
+	    default: break;
+	 }
+	 break;
+      case 0x98:
+	 *manufacturer = "Toshiba";
+	 switch (device_id) {
+	    default: break;
+	 }
+	 break;
+      default:
+	 break;
+   }
+
+}
+
 static int dump_flash_info(const struct mdproto_cmd_flash_info_t *data)
 {
    unsigned block;
    unsigned i, max_erase_block;
+   const char *manufacturer;
+   const char *device_name;
    char tmp[80];
    assert(data);
 
@@ -589,15 +696,18 @@ static int dump_flash_info(const struct mdproto_cmd_flash_info_t *data)
       return -1;
    }
 
+   flash_get_name(ntohs(data->manuf_id), ntohs(data->device_id),
+	 &manufacturer, &device_name);
+
    printf(
-	 "Manufactirer: 0x%04x\n"
-	 "Device ID: 0x%04x\n"
+	 "Manufactirer: 0x%04x (%s)\n"
+	 "Device ID: 0x%04x (%s)\n"
 	 "Primary vendor command set code: 0x%04x\n"
 	 "Address for primary algotithm extended query table: 0x%04x\n"
 	 "Alternate vendor command set code: 0x%04x\n"
 	 "Address for alternate algorithm extended query table: 0x%04x\n",
-	 (unsigned)ntohs(data->manuf_id),
-	 (unsigned)ntohs(data->device_id),
+	 (unsigned)ntohs(data->manuf_id), manufacturer,
+	 (unsigned)ntohs(data->device_id), device_name,
 	 (unsigned)ntohs(data->cfi_id_string.primary_alg_id),
 	 (unsigned)ntohs(data->cfi_id_string.primary_alg_tbl),
 	 (unsigned)ntohs(data->cfi_id_string.secondary_alg_id),
