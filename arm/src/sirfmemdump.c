@@ -57,7 +57,7 @@ int write_cmd_response(uint8_t cmd_id, void *data, size_t data_size);
 static struct mdproto_cmd_buf_t buf;
 
 /* flash.c  */
-int flash_init();
+int flash_init(void);
 int flash_get_info(struct mdproto_cmd_flash_info_t *dst);
 
 int main(void)

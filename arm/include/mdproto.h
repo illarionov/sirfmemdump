@@ -87,8 +87,7 @@ struct mdproto_cmd_flash_info_t {
       uint16_t interface_desc;
       uint16_t max_write_buf_size;   /* 1<<n bytes */
       uint8_t  num_erase_blocks;
-      uint32_t erase_block_0;
-      uint32_t erase_blocks[5];
+      uint32_t erase_blocks[8];
    } flash_geometry;
 
 } __attribute__((packed));

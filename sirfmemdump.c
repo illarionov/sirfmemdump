@@ -568,6 +568,7 @@ int cmd_flash_info(int pfd)
 static int dump_flash_info(const struct mdproto_cmd_flash_info_t *data)
 {
    unsigned block;
+   unsigned i, max_erase_block;
    char tmp[80];
    assert(data);
 
@@ -664,21 +665,30 @@ static int dump_flash_info(const struct mdproto_cmd_flash_info_t *data)
       snprintf(tmp, sizeof(tmp), "%.0f bytes",
 	    pow(2.0, (double)ntohs(data->flash_geometry.max_write_buf_size)));
 
-   block = ntohl(data->flash_geometry.erase_block_0);
    printf(
 	 "Device size: %.0fMbit\n"
 	 "Flash device interface description: 0x%04x\n"
 	 "Maximum buffer size: %s\n"
-	 "Number of erase sectors: %u\n"
-	 "Erase sector 0: %u blocks * %u bytes\n",
+	 "Number of erase sectors: %u\n",
 	 pow(2.0, (double)data->flash_geometry.size) * 8.0 / (1024.0*1024.0),
 	 (unsigned)ntohs(data->flash_geometry.interface_desc),
 	 tmp,
-	 (unsigned)data->flash_geometry.num_erase_blocks,
-
-	 (block & 0xffff)+1,
-	 ( ((block >> 16) & 0xffff) ? ((block >> 16) & 0xffff) * 256 : 128)
+	 (unsigned)data->flash_geometry.num_erase_blocks
       );
+
+   max_erase_block = data->flash_geometry.num_erase_blocks;
+   if (max_erase_block > sizeof(data->flash_geometry.erase_blocks)/sizeof(data->flash_geometry.erase_blocks[0]))
+      max_erase_block = sizeof(data->flash_geometry.erase_blocks)/sizeof(data->flash_geometry.erase_blocks[0]);
+
+   for (i=0; i < max_erase_block; i++) {
+      block = ntohl(data->flash_geometry.erase_blocks[i]);
+      printf(
+	    "Erase sector %u: %u blocks * %u bytes\n",
+	    i,
+	    (block & 0xffff)+1,
+	    ( ((block >> 16) & 0xffff) ? ((block >> 16) & 0xffff) * 256 : 128)
+      );
+   }
 
    return 1;
 }

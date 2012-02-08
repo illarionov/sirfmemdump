@@ -112,7 +112,7 @@ flash_16bit_done:
 
 int flash_get_info(struct mdproto_cmd_flash_info_t *dst)
 {
-   unsigned i;
+   unsigned i, max_erase_block, eblock_addr;
 
    dst->manuf_id = 0xffff;
    dst->device_id = 0xffff;
@@ -142,7 +142,6 @@ int flash_get_info(struct mdproto_cmd_flash_info_t *dst)
    dst->flash_geometry.interface_desc = 0;
    dst->flash_geometry.max_write_buf_size = 0;
    dst->flash_geometry.num_erase_blocks = 0;
-   dst->flash_geometry.erase_block_0=0;
    for(i=0; i<sizeof(dst->flash_geometry.erase_blocks)/sizeof(dst->flash_geometry.erase_blocks[0]);i++)
       dst->flash_geometry.erase_blocks[i]=0;
 
@@ -201,9 +200,15 @@ int flash_get_info(struct mdproto_cmd_flash_info_t *dst)
    dst->flash_geometry.interface_desc = get_uint16(0x28);
    dst->flash_geometry.max_write_buf_size = get_uint16(0x2a);
    dst->flash_geometry.num_erase_blocks = get_uint8(0x2c);
-   dst->flash_geometry.erase_block_0 = get_uint32(0x2d);
 
-   /* XXX: additional erase blocks  */
+   max_erase_block = dst->flash_geometry.num_erase_blocks;
+   if (max_erase_block > sizeof(dst->flash_geometry.erase_blocks)/sizeof(dst->flash_geometry.erase_blocks[0]))
+      max_erase_block = sizeof(dst->flash_geometry.erase_blocks)/sizeof(dst->flash_geometry.erase_blocks[0]);
+
+   for (i=0, eblock_addr=0x2d; i < dst->flash_geometry.size; i++) {
+      dst->flash_geometry.erase_blocks[i]=get_uint32(eblock_addr);
+      eblock_addr += 4;
+   }
 
 #undef get_uint8
 #undef get_uint16
