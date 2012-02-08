@@ -23,6 +23,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <math.h>
 #include <signal.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -566,6 +567,8 @@ int cmd_flash_info(int pfd)
 
 static int dump_flash_info(const struct mdproto_cmd_flash_info_t *data)
 {
+   unsigned block;
+   char tmp[80];
    assert(data);
 
    if ((data->manuf_id == 0xff)
@@ -573,9 +576,6 @@ static int dump_flash_info(const struct mdproto_cmd_flash_info_t *data)
       gpsd_report(LOG_PROG, "unknown flash type\n");
       return 0;
    }
-
-   gpsd_report(LOG_PROG, "manufacturer: 0x%04x device id: 0x%04x\n", data->manuf_id,
-	data->device_id);
 
    if ( (data->cfi_id_string.q != 'Q')
 	 || (data->cfi_id_string.r != 'R')
@@ -588,30 +588,97 @@ static int dump_flash_info(const struct mdproto_cmd_flash_info_t *data)
       return -1;
    }
 
-   gpsd_report(LOG_PROG,
+   printf(
+	 "Manufactirer: 0x%04x\n"
+	 "Device ID: 0x%04x\n"
 	 "Primary vendor command set code: 0x%04x\n"
 	 "Address for primary algotithm extended query table: 0x%04x\n"
 	 "Alternate vendor command set code: 0x%04x\n"
-	 "Address for alternate algorithm extended query table: 0x%04x\n\n"
-	 ,
+	 "Address for alternate algorithm extended query table: 0x%04x\n",
+	 (unsigned)ntohs(data->manuf_id),
+	 (unsigned)ntohs(data->device_id),
 	 (unsigned)ntohs(data->cfi_id_string.primary_alg_id),
 	 (unsigned)ntohs(data->cfi_id_string.primary_alg_tbl),
 	 (unsigned)ntohs(data->cfi_id_string.secondary_alg_id),
-	 (unsigned)ntohs(data->cfi_id_string.secondary_alg_tbl));
+	 (unsigned)ntohs(data->cfi_id_string.secondary_alg_tbl)
+	 );
 
-   /*
-   gpsd_report(LOG_PROG,
-	 "Vcc min: %.3fV\t Vcc max: %.3fV\n"
-	 "Vpp min: %.3fV\t Vpp max: $.3fV\n"
-	 "Word write timemout: %fus"
-	 "Buffer write timeout: %fus"
-	 "Block erase timeout: %fms"
-	 "Chip erase timeout: %fms"
-	 "Max Word write timemout: %fus"
-	 "Max Buffer write timeout: %fus"
-	 "Max block erase timeout: %fms"
-	 "Max chip erase timeout: %fms");
-	 */
+   tmp[sizeof(tmp)-1]='\0';
+   /* Vpp */
+   if ((data->interface_info.vpp_min == 0)
+	 && (data->interface_info.vpp_max == 0)) {
+      strncpy(tmp, "no Vpp pin present", sizeof(tmp)-1);
+   }else
+      snprintf(tmp, sizeof(tmp), "%.3f / %.3f",
+	 (double)((data->interface_info.vpp_min >> 4) & 0x0f) + (double)(data->interface_info.vpp_min & 0x0f) * 0.100,
+	 (double)((data->interface_info.vpp_max >> 4) & 0x0f) + (double)(data->interface_info.vpp_max & 0x0f) * 0.100
+	 );
+
+   printf(
+	 "Vcc min/max (V): %.3f / %.3f\n"
+	 "Vpp min/max (V): %s\n",
+	 (double)((data->interface_info.vcc_min >> 4) & 0x0f) + (double)(data->interface_info.vcc_min & 0x0f) * 0.100,
+	 (double)((data->interface_info.vcc_max >> 4) & 0x0f) + (double)(data->interface_info.vcc_max & 0x0f) * 0.100,
+	 tmp
+   );
+
+   /* Word / buffer timeouts */
+   if ((data->interface_info.buf_write_tmout == 0)
+	 && (data->interface_info.max_buf_write_tmout == 0))
+      strncpy(tmp, "not supported", sizeof(tmp)-1);
+   else
+      snprintf(tmp, sizeof(tmp), "%.3f / %.3f",
+	 pow(2.0, (double)data->interface_info.buf_write_tmout),
+	 pow(2.0, (double)data->interface_info.max_buf_write_tmout) * pow(2.0, (double)data->interface_info.buf_write_tmout)
+	 );
+
+   printf(
+	 "Word   write timemout typical/max (us): %.0f / %.0f \n"
+	 "Buffer write timemout typical/max (us): %s \n",
+	 pow(2.0, (double)data->interface_info.word_write_tmout),
+	 pow(2.0, (double)data->interface_info.max_word_write_tmout) * pow(2.0, (double)data->interface_info.word_write_tmout),
+	 tmp
+	 );
+
+   /* Erase timeouts */
+   if ((data->interface_info.chip_erase_tmout == 0)
+	 && (data->interface_info.max_chip_erase_tmout == 0))
+      strncpy(tmp, "not supported", sizeof(tmp)-1);
+   else
+      snprintf(tmp, sizeof(tmp), "%.0f / %.0f",
+	 pow(2.0, (double)data->interface_info.chip_erase_tmout),
+	 pow(2.0, (double)data->interface_info.max_chip_erase_tmout) * pow(2.0, (double)data->interface_info.chip_erase_tmout)
+	 );
+
+   printf(
+	 "Block erase timeout typical/max (ms): %.0f / %.0f \n"
+	 "Chip  erase timeout typical/max (ms): %s\n",
+	 pow(2.0, (double)data->interface_info.block_erase_tmout),
+	 pow(2.0, (double)data->interface_info.max_block_erase_tmout) * pow(2.0, (double)data->interface_info.block_erase_tmout),
+	 tmp
+   );
+
+   if (data->flash_geometry.max_write_buf_size == 0)
+      strncpy(tmp, "not supported", sizeof(tmp)-1);
+   else
+      snprintf(tmp, sizeof(tmp), "%.0f bytes",
+	    pow(2.0, (double)ntohs(data->flash_geometry.max_write_buf_size)));
+
+   block = ntohl(data->flash_geometry.erase_block_0);
+   printf(
+	 "Device size: %.0fMbit\n"
+	 "Flash device interface description: 0x%04x\n"
+	 "Maximum buffer size: %s\n"
+	 "Number of erase sectors: %u\n"
+	 "Erase sector 0: %u blocks * %u bytes\n",
+	 pow(2.0, (double)data->flash_geometry.size) * 8.0 / (1024.0*1024.0),
+	 (unsigned)ntohs(data->flash_geometry.interface_desc),
+	 tmp,
+	 (unsigned)data->flash_geometry.num_erase_blocks,
+
+	 (block & 0xffff)+1,
+	 ( ((block >> 16) & 0xffff) ? ((block >> 16) & 0xffff) * 256 : 128)
+      );
 
    return 1;
 }

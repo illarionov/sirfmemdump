@@ -114,8 +114,8 @@ int flash_get_info(struct mdproto_cmd_flash_info_t *dst)
 {
    unsigned i;
 
-   dst->manuf_id = 0xff;
-   dst->device_id = 0xff;
+   dst->manuf_id = 0xffff;
+   dst->device_id = 0xffff;
 
    dst->cfi_id_string.q = 0xff;
    dst->cfi_id_string.r = 0xff;
@@ -155,25 +155,26 @@ int flash_get_info(struct mdproto_cmd_flash_info_t *dst)
    flash[0x5555] = 0x9090; /* JEDEC ID query */
    wait(100);  /* Wait Tida */
 
-   dst->manuf_id = flash[0] & 0xff;
-   dst->device_id = flash[1] & 0xff;
+   dst->manuf_id = sirfgps_htons(flash[0]);
+   dst->device_id = sirfgps_htons(flash[1]);
 
    /* CFI query */
    flash_sdp_unprotect();
    flash[0x5555] = 0x9898; /* CFI query */
    wait(100);  /* Wait Tida */
 
+/* Result is in network byte order */
 #define get_uint8(_a) (flash[_a]&0xff)
-#define get_uint16(_a) (sirfgps_htons(\
-	 ((uint16_t)(flash[_a] & 0xff) << 8) \
+#define get_uint16(_a) (\
+	 ((uint16_t)(flash[(_a)+0] & 0xff) << 8) \
 	 | (uint16_t)(flash[(_a)+1] & 0xff) \
-	 ))
-#define get_uint32(_a) ( sirfgps_htonl(\
-	 ((uint32_t)(flash[(_a)] & 0xff) << 24) \
+	 )
+#define get_uint32(_a) ( \
+	 ((uint32_t)(flash[(_a)+0] & 0xff) << 24) \
 	 | ((uint32_t)(flash[(_a)+1] & 0xff) << 16) \
 	 | ((uint32_t)(flash[(_a)+2] & 0xff) << 8) \
 	 | (uint32_t)(flash[(_a)+3] & 0xff) \
-	 ))
+	 )
 
    dst->cfi_id_string.q = get_uint8(0x10);
    dst->cfi_id_string.r = get_uint8(0x11);
