@@ -27,6 +27,8 @@ USE_THUMB_MODE = YES
 # Target file name (without extension).
 TARGET = sirfmemdump
 
+PROGRAM_VERSION := $(shell git describe)
+
 # List C source files here. (C dependencies are automatically generated.)
 # use file-extension c for "c-only"-files
 SRC  = src/$(TARGET).c
@@ -95,7 +97,7 @@ CSTANDARD = -std=gnu99
 # CINCS =
 
 # Place -D or -U options for ASM here
-#ADEFS =
+ADEFS = -DPROGRAM_VERSION="\"$(TARGET) $(PROGRAM_VERSION)\""
 
 # Compiler flags.
 

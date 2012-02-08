@@ -80,6 +80,7 @@ SECTIONS
 		*(.data .data.*)
 		*(.gnu.linkonce.d.*)
 		SORT(CONSTRUCTORS)
+		*(.program_version)
 
 	} >XDATA
 	. = ALIGN(4);

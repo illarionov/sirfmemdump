@@ -12,6 +12,12 @@
 	.equ    I_Bit,          0x80				/* when I bit is set, IRQ is disabled */
 	.equ    F_Bit,          0x40				/* when F bit is set, FIQ is disabled */
 
+#ifndef PROGRAM_VERSION
+#define PROGRAM_VERSION "0.1"
+#endif
+	.section .program_version
+	    .ascii PROGRAM_VERSION
+
 /* Startup Code must be linked first at Address at which it expects to run. */
 
 	.text
