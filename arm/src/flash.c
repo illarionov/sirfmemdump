@@ -117,12 +117,34 @@ int flash_get_info(struct mdproto_cmd_flash_info_t *dst)
    dst->manuf_id = 0xff;
    dst->device_id = 0xff;
 
-   for (i=0; i<sizeof(dst->cfi_query_id_data)/sizeof(dst->cfi_query_id_data[0]); i++)
-      dst->cfi_query_id_data[i] = 0xff;
-   for (i=0; i<sizeof(dst->sys_int_info)/sizeof(dst->sys_int_info[0]); i++)
-      dst->sys_int_info[i] = 0xff;
-   for (i=0; i<sizeof(dst->dev_geometry)/sizeof(dst->dev_geometry[0]); i++)
-      dst->dev_geometry[i] = 0xff;
+   dst->cfi_id_string.q = 0xff;
+   dst->cfi_id_string.r = 0xff;
+   dst->cfi_id_string.y = 0xff;
+   dst->cfi_id_string.primary_alg_id = 0;
+   dst->cfi_id_string.primary_alg_tbl = 0;
+   dst->cfi_id_string.secondary_alg_id = 0;
+   dst->cfi_id_string.secondary_alg_tbl = 0;
+
+   dst->interface_info.vcc_min = 0;
+   dst->interface_info.vcc_max = 0;
+   dst->interface_info.vpp_min = 0;
+   dst->interface_info.vpp_max = 0;
+   dst->interface_info.word_write_tmout  = 0;
+   dst->interface_info.buf_write_tmout   = 0;
+   dst->interface_info.block_erase_tmout = 0;
+   dst->interface_info.chip_erase_tmout  = 0;
+   dst->interface_info.max_word_write_tmout  = 0;
+   dst->interface_info.max_buf_write_tmout   = 0;
+   dst->interface_info.max_block_erase_tmout = 0;
+   dst->interface_info.max_chip_erase_tmout  = 0;
+
+   dst->flash_geometry.size = 0;
+   dst->flash_geometry.interface_desc = 0;
+   dst->flash_geometry.max_write_buf_size = 0;
+   dst->flash_geometry.num_erase_blocks = 0;
+   dst->flash_geometry.erase_block_0=0;
+   for(i=0; i<sizeof(dst->flash_geometry.erase_blocks)/sizeof(dst->flash_geometry.erase_blocks[0]);i++)
+      dst->flash_geometry.erase_blocks[i]=0;
 
    /* unsupported */
    if (flash_bus_width != 16)
@@ -133,22 +155,59 @@ int flash_get_info(struct mdproto_cmd_flash_info_t *dst)
    flash[0x5555] = 0x9090; /* JEDEC ID query */
    wait(100);  /* Wait Tida */
 
-   dst->manuf_id = flash[0];
-   dst->device_id = flash[1];
+   dst->manuf_id = flash[0] & 0xff;
+   dst->device_id = flash[1] & 0xff;
 
    /* CFI query */
    flash_sdp_unprotect();
    flash[0x5555] = 0x9898; /* CFI query */
    wait(100);  /* Wait Tida */
 
-   for (i=0; i<sizeof(dst->cfi_query_id_data)/sizeof(dst->cfi_query_id_data[0]); i++)
-      dst->cfi_query_id_data[i] = flash[0x10+i];
-   for (i=0; i<sizeof(dst->sys_int_info)/sizeof(dst->sys_int_info[0]); i++)
-      dst->sys_int_info[i] = flash[0x1b+i];
-   for (i=0; i<sizeof(dst->dev_geometry)/sizeof(dst->dev_geometry[0]); i++)
-      dst->dev_geometry[i] = flash[0x27+i];
+#define get_uint8(_a) (flash[_a]&0xff)
+#define get_uint16(_a) (sirfgps_htons(\
+	 ((uint16_t)(flash[_a] & 0xff) << 8) \
+	 | (uint16_t)(flash[(_a)+1] & 0xff) \
+	 ))
+#define get_uint32(_a) ( sirfgps_htonl(\
+	 ((uint32_t)(flash[(_a)] & 0xff) << 24) \
+	 | ((uint32_t)(flash[(_a)+1] & 0xff) << 16) \
+	 | ((uint32_t)(flash[(_a)+2] & 0xff) << 8) \
+	 | (uint32_t)(flash[(_a)+3] & 0xff) \
+	 ))
 
-   
+   dst->cfi_id_string.q = get_uint8(0x10);
+   dst->cfi_id_string.r = get_uint8(0x11);
+   dst->cfi_id_string.y = get_uint8(0x12);
+   dst->cfi_id_string.primary_alg_id = get_uint16(0x13);
+   dst->cfi_id_string.primary_alg_tbl = get_uint16(0x15);
+   dst->cfi_id_string.secondary_alg_id = get_uint16(0x17);
+   dst->cfi_id_string.secondary_alg_tbl = get_uint16(0x17);
+
+   dst->interface_info.vcc_min = get_uint8(0x1b);
+   dst->interface_info.vcc_max = get_uint8(0x1c);
+   dst->interface_info.vpp_min = get_uint8(0x1d);
+   dst->interface_info.vpp_max = get_uint8(0x1e);
+   dst->interface_info.word_write_tmout  = get_uint8(0x1f);
+   dst->interface_info.buf_write_tmout   = get_uint8(0x20);
+   dst->interface_info.block_erase_tmout = get_uint8(0x21);
+   dst->interface_info.chip_erase_tmout  = get_uint8(0x22);
+   dst->interface_info.max_word_write_tmout  = get_uint8(0x23);
+   dst->interface_info.max_buf_write_tmout   = get_uint8(0x24);
+   dst->interface_info.max_block_erase_tmout = get_uint8(0x25);
+   dst->interface_info.max_chip_erase_tmout  = get_uint8(0x26);
+
+   dst->flash_geometry.size = get_uint8(0x27);
+   dst->flash_geometry.interface_desc = get_uint16(0x28);
+   dst->flash_geometry.max_write_buf_size = get_uint16(0x2a);
+   dst->flash_geometry.num_erase_blocks = get_uint8(0x2c);
+   dst->flash_geometry.erase_block_0 = get_uint32(0x2d);
+
+   /* XXX: additional erase blocks  */
+
+#undef get_uint8
+#undef get_uint16
+#undef get_uint32
+
    flash[0] = 0xffff; /* read array mode */
 
    return 1;

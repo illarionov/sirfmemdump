@@ -17,6 +17,13 @@
 #ifndef _SIRFGPSCONF_H
 #define _SIRFGPSCONF_H
 
+#define sirfgps_htons(_x) (uint16_t)((_x) << 8 | (_x) >> 8)
+#define sirfgps_htonl(_x) \
+              (((_x) >> 24) |                         \
+              (((_x) & (0xff << 16)) >> 8) |          \
+              (((_x) & (0xff << 8)) << 8) |           \
+              ((_x) << 24))
+
 #define USE_UART_A
 
 #endif /* _SIRFGPSCONF_H */

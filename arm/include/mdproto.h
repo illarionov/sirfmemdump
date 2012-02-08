@@ -57,12 +57,41 @@ struct mdproto_cmd_flash_info_t {
 
    /* cfi query. cmd 98h  */
    /* 10 - 1a  */
-   uint16_t cfi_query_id_data[11];
+   struct {
+      uint8_t q, r, y;
+      uint16_t primary_alg_id;
+      uint16_t primary_alg_tbl;
+      uint16_t secondary_alg_id;
+      uint16_t secondary_alg_tbl;
+   } cfi_id_string;
+
    /* 1b - 26  */
-   uint16_t sys_int_info[12];
+   struct {
+      uint8_t vcc_min;                /* bits 0-3: BCD *100mV; bits 4-7: HEX V */
+      uint8_t vcc_max;                /* bits 0-3: BCD *100mV; bits 4-7: HEX V */
+      uint8_t vpp_min;                /* bits 0-3: BCD *100mV; bits 4-7: HEX V */
+      uint8_t vpp_max;                /* bits 0-3: BCD *100mV; bits 4-7: HEX V */
+      uint8_t word_write_tmout;       /* 1<<n us  */
+      uint8_t buf_write_tmout;        /* 1<<n us  */
+      uint8_t block_erase_tmout;      /* 1<<n ms  */
+      uint8_t chip_erase_tmout;       /* 1<<n ms  */
+      uint8_t max_word_write_tmout;   /* 1<<n * word_write_tmout  */
+      uint8_t max_buf_write_tmout;    /* 1<<n * buf_write_tmout  */
+      uint8_t max_block_erase_tmout;  /* 1<<n * block_erase_tmout  */
+      uint8_t max_chip_erase_tmout;   /* 1<<n * chip_erase_tmout  */
+   } interface_info;
+
    /* 27 - 34 */
-   uint16_t dev_geometry[14];
-} __attribute__((packed, aligned(__alignof__(uint16_t))));
+   struct {
+      uint8_t size;                  /* 1<<n bytes  */
+      uint16_t interface_desc;
+      uint16_t max_write_buf_size;   /* 1<<n bytes */
+      uint8_t  num_erase_blocks;
+      uint32_t erase_block_0;
+      uint32_t erase_blocks[5];
+   } flash_geometry;
+
+} __attribute__((packed));
 
 
 int mdproto_pkt_init(struct mdproto_cmd_buf_t *buf,

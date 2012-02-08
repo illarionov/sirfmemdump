@@ -567,8 +567,51 @@ int cmd_flash_info(int pfd)
 static int dump_flash_info(const struct mdproto_cmd_flash_info_t *data)
 {
    assert(data);
+
+   if ((data->manuf_id == 0xff)
+	 && (data->device_id == 0xff)) {
+      gpsd_report(LOG_PROG, "unknown flash type\n");
+      return 0;
+   }
+
    gpsd_report(LOG_PROG, "manufacturer: 0x%04x device id: 0x%04x\n", data->manuf_id,
 	data->device_id);
+
+   if ( (data->cfi_id_string.q != 'Q')
+	 || (data->cfi_id_string.r != 'R')
+	 || (data->cfi_id_string.y != 'Y')) {
+      gpsd_report(LOG_PROG, "Wrong CFI Query-unique string (QRY): 0x%2x 0x%2x 0x%2x\n",
+	    data->cfi_id_string.q,
+	    data->cfi_id_string.r,
+	    data->cfi_id_string.y
+	    );
+      return -1;
+   }
+
+   gpsd_report(LOG_PROG,
+	 "Primary vendor command set code: 0x%04x\n"
+	 "Address for primary algotithm extended query table: 0x%04x\n"
+	 "Alternate vendor command set code: 0x%04x\n"
+	 "Address for alternate algorithm extended query table: 0x%04x\n\n"
+	 ,
+	 (unsigned)ntohs(data->cfi_id_string.primary_alg_id),
+	 (unsigned)ntohs(data->cfi_id_string.primary_alg_tbl),
+	 (unsigned)ntohs(data->cfi_id_string.secondary_alg_id),
+	 (unsigned)ntohs(data->cfi_id_string.secondary_alg_tbl));
+
+   /*
+   gpsd_report(LOG_PROG,
+	 "Vcc min: %.3fV\t Vcc max: %.3fV\n"
+	 "Vpp min: %.3fV\t Vpp max: $.3fV\n"
+	 "Word write timemout: %fus"
+	 "Buffer write timeout: %fus"
+	 "Block erase timeout: %fms"
+	 "Chip erase timeout: %fms"
+	 "Max Word write timemout: %fus"
+	 "Max Buffer write timeout: %fus"
+	 "Max block erase timeout: %fms"
+	 "Max chip erase timeout: %fms");
+	 */
 
    return 1;
 }
