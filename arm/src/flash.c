@@ -29,6 +29,9 @@ extern volatile enum sirfgps_version_e gps_version; /* sirfmemdump.c */
 
 static void flash_sdp_null_unprotect(void);
 static void flash_sdp_16b_unprotect(void);
+static void flash_16b_cfi_query(void);
+static void flash_16b_jedec_id_query(void);
+static void flash_16b_read_array_mode(void);
 
 static volatile uint16_t *flash __attribute__((aligned(__alignof__(uint16_t))));
 static volatile unsigned flash_bus_width = 16;
@@ -65,22 +68,18 @@ int flash_init()
       orig[0] = flash[0];
       orig[1] = flash[1];
 
-      flash[0x5555] = 0x9898;  /* CFI query */
-      wait(100);               /* Wait Tida  */
-
+      flash_sdp_unprotect = &flash_sdp_null_unprotect;
+      flash_16b_cfi_query();
       if ( ((flash[0x10] & 0xff) == 'Q')
 	    && ((flash[0x11] & 0xff) == 'R')
 	    && ((flash[0x12] & 0xff) == 'Y')) {
 	 /* CFI device */
-	 flash_sdp_unprotect = &flash_sdp_null_unprotect;
 	 goto flash_16bit_done;
       }
 
       /* Check with SDP */
       flash_sdp_unprotect = &flash_sdp_16b_unprotect;
-      flash_sdp_unprotect();
-      flash[0] = 0x9898;  /* CFI query */
-      wait(100);          /* Wait Tida  */
+      flash_16b_cfi_query();
 
       if ( ((flash[0x10] & 0xff) == 'Q')
 	    && ((flash[0x11] & 0xff) == 'R')
@@ -90,12 +89,12 @@ int flash_init()
       }
 
       /* JEDEC ID request */
-      flash[0] = 0x9090;
+      flash_sdp_unprotect = &flash_sdp_null_unprotect;
+      flash_16b_jedec_id_query();
       if (flash[0] == 0x90) {
 	 /* SRAM device */
 	 flash[0]=orig[0];
 	 flash[1]=orig[1];
-	 flash_sdp_unprotect = &flash_sdp_null_unprotect;
 	 flash_bus_width=0;
 	 return 0;
       }
@@ -103,7 +102,7 @@ int flash_init()
       /* JEDEC flash device */
 
 flash_16bit_done:
-      flash[0] = 0xffff; /* read array mode */
+      flash_16b_read_array_mode();
       return 0;
    } /* flash_bus_width=16 */
 
@@ -149,18 +148,13 @@ int flash_get_info(struct mdproto_cmd_flash_info_t *dst)
    if (flash_bus_width != 16)
       return 0;
 
-   /* JEDEC ID query */
-   flash_sdp_unprotect();
-   flash[0x5555] = 0x9090; /* JEDEC ID query */
-   wait(100);  /* Wait Tida */
+   flash_16b_cfi_query();
+
+   flash_16b_jedec_id_query();
 
    dst->manuf_id = sirfgps_htons(flash[0]);
    dst->device_id = sirfgps_htons(flash[1]);
 
-   /* CFI query */
-   flash_sdp_unprotect();
-   flash[0x5555] = 0x9898; /* CFI query */
-   wait(100);  /* Wait Tida */
 
 /* Result is in network byte order */
 #define get_uint8(_a) (flash[_a]&0xff)
@@ -214,13 +208,34 @@ int flash_get_info(struct mdproto_cmd_flash_info_t *dst)
 #undef get_uint16
 #undef get_uint32
 
-   flash[0] = 0xffff; /* read array mode */
+   flash_16b_read_array_mode();
 
    return 1;
 }
 
+/* 98h CFI query */
+static void flash_16b_cfi_query(void)
+{
+   flash_sdp_unprotect();
+   flash[0x5555] = 0x9898;  /* CFI query */
+   wait(500);          /* Wait Tida  */
+}
 
+/* 90h Soft ID query */
+static void flash_16b_jedec_id_query(void)
+{
+   flash_sdp_unprotect();
+   flash[0] = 0x9090; /* Soft ID query */
+   wait(500);  /* Wait Tida */
+}
 
+/* Software ID exit / CFI exit */
+static void flash_16b_read_array_mode(void)
+{
+   flash_sdp_unprotect();
+   flash[0x5555] = 0xf0f0; /* read array mode */
+   wait(500);  /* Wait Tida */
+}
 
 /* Software data protection - unprotect prefix */
 static void flash_sdp_16b_unprotect()
