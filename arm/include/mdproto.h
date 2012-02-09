@@ -63,7 +63,7 @@ struct mdproto_cmd_flash_info_t {
       uint16_t primary_alg_tbl;
       uint16_t secondary_alg_id;
       uint16_t secondary_alg_tbl;
-   } cfi_id_string;
+   } __attribute__((packed)) cfi_id_string;
 
    /* 1b - 26  */
    struct {
@@ -79,7 +79,7 @@ struct mdproto_cmd_flash_info_t {
       uint8_t max_buf_write_tmout;    /* 1<<n * buf_write_tmout  */
       uint8_t max_block_erase_tmout;  /* 1<<n * block_erase_tmout  */
       uint8_t max_chip_erase_tmout;   /* 1<<n * chip_erase_tmout  */
-   } interface_info;
+   }  __attribute__((packed)) interface_info;
 
    /* 27 - 34 */
    struct {
@@ -88,10 +88,9 @@ struct mdproto_cmd_flash_info_t {
       uint16_t max_write_buf_size;   /* 1<<n bytes */
       uint8_t  num_erase_blocks;
       uint32_t erase_blocks[8];
-   } flash_geometry;
+   }  __attribute__((packed)) flash_geometry;
 
 } __attribute__((packed));
-
 
 int mdproto_pkt_init(struct mdproto_cmd_buf_t *buf,
       unsigned cmd_id,
