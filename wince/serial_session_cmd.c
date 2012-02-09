@@ -17,11 +17,16 @@
 #include "StdAfx.h"
 #include "sirfmemdump.h"
 
+
 extern HINSTANCE			g_hInst;			// current instance
 
 /* serial_session.c */
 int serial_session_set_perror(struct serial_session_t *s, const TCHAR *str);
 int serial_session_set_error(struct serial_session_t *s, int last_err, const TCHAR *str);
+
+/* flash.c */
+int dump_flash_info(const struct mdproto_cmd_flash_info_t *data);
+
 
 /* NMEA/SIRF */
 #define MAX_NMEA_MSG_SIZE 1023
@@ -44,6 +49,9 @@ enum mdproto_cmd_t {
    MDPROTO_CMD_PING_RESPONSE      = 'Z',
    MDPROTO_CMD_MEM_READ           = 'x',
    MDPROTO_CMD_MEM_READ_RESPONSE  = 'X',
+   MDPROTO_CMD_EXEC_CODE_RESPONSE ='Y',
+   MDPROTO_CMD_FLASH_INFO         ='w',
+   MDPROTO_CMD_FLASH_INFO_RESPONSE ='W',
 
    MDPROTO_STATUS_OK                  = '+',
    MDPROTO_STATUS_WRONG_CMD           = '?',
@@ -56,12 +64,12 @@ enum mdproto_cmd_t {
 #define MDPROTO_CMD_MAX_RAW_DATA_SIZE 508
 
 struct mdproto_cmd_buf_t {
-   unsigned __int16 size;
+   uint16_t size;
    union {
-      unsigned __int8 id;
-      unsigned __int8 p[512];
+      uint8_t id;
+      uint8_t p[512];
    } data;
-   unsigned __int8 _csum_buf;
+   uint8_t _csum_buf;
 };
 
 
@@ -72,7 +80,7 @@ static unsigned sirf_payload_csum(const BYTE *payload, unsigned payload_size);
 
 static int mdproto_pkt_init(struct mdproto_cmd_buf_t *buf,
       unsigned cmd_id, const void *raw_data, unsigned raw_data_size);
-static unsigned __int8 mdproto_pkt_csum(const void *buf, size_t size);
+static uint8_t mdproto_pkt_csum(const void *buf, size_t size);
 static int read_mdproto_pkt(struct serial_session_t *s, struct mdproto_cmd_buf_t *dst);
 
 static int close_dump_request(struct serial_session_t *s);
@@ -266,15 +274,15 @@ static int sirf_vsnprintf_payload(BYTE *dst, size_t dst_size, const TCHAR *fmt, 
 	unsigned dst_p;
 
 	union {
-		signed   __int8 i8;
-		unsigned __int8 u8;
-		signed   __int16 i16;
-		unsigned __int16 u16;
-		signed   __int32 i32;
-		unsigned __int32 u32;
+		int8_t   i8;
+		int8_t   u8;
+		int16_t  i16;
+		uint16_t u16;
+		int32_t  i32;
+		uint32_t u32;
 		float    f;
 		double d;
-		unsigned __int32 u32u32[2];
+		uint32_t u32u32[2];
 	} val;
 
 	if (fmt == NULL)
@@ -359,7 +367,7 @@ static int sirf_vsnprintf_payload(BYTE *dst, size_t dst_size, const TCHAR *fmt, 
 			assert ( sizeof(val.d) == 8);
 			val.d = va_arg(args, double);
 			if (dst && ((dst_p  + 7) < dst_size)) {
-				unsigned __int32 *p0 = (unsigned __int32 *)&dst[dst_p];
+				uint32_t *p0 = (uint32_t *)&dst[dst_p];
 				p0[0] = htonl(val.u32u32[1]);
 				p0[1] = htonl(val.u32u32[0]);
 			}
@@ -497,14 +505,14 @@ static int mdproto_pkt_init(struct mdproto_cmd_buf_t *buf,
    return raw_data_size+4;
 }
 
-static unsigned __int8 mdproto_pkt_csum(const void *buf, size_t size)
+static uint8_t mdproto_pkt_csum(const void *buf, size_t size)
 {
-   unsigned __int8 csum = 0;
+   uint8_t csum = 0;
    size_t i;
 
    for (i=0; i < size ; i++)
-      csum += ((const unsigned __int8 *)buf)[i];
-   return (unsigned __int8)(0 - csum);
+      csum += ((const uint8_t *)buf)[i];
+   return (uint8_t)(0 - csum);
 }
 
 static int read_mdproto_pkt(struct serial_session_t *s, struct mdproto_cmd_buf_t *dst)
@@ -969,13 +977,13 @@ int internal_boot_send_loader(struct serial_session_t *s)
 {
 #pragma pack(push, 1)
 	struct {
-		unsigned __int8 s;
-		unsigned __int8 boost;
-		unsigned __int32 size;
+		uint8_t s;
+		uint8_t boost;
+		uint32_t size;
 	} header;
 #pragma pack(pop)
 
-	unsigned __int32 footer;
+	uint32_t footer;
 	int rcvd;
 	int lock_res;
 	const BYTE *loader;
@@ -1152,8 +1160,8 @@ int memdump_cmd_dump(struct serial_session_t *s)
 
 #pragma pack(push, 1)
 	struct {
-		unsigned __int32 src;
-		unsigned __int32 dst;
+		uint32_t src;
+		uint32_t dst;
 	} req;
 #pragma pack(pop)
 
@@ -1287,6 +1295,57 @@ static int close_dump_request(struct serial_session_t *s)
 	return -1;
 }
 
+int memdump_cmd_get_flash_info(struct serial_session_t *s)
+{
+	int msg_size;
+	int lock_res;
+	struct mdproto_cmd_buf_t cmd;
+
+	assert(s);
+
+	logger_debug(TEXT("Memdump: get flash info"));
+
+	msg_size = mdproto_pkt_init(&cmd, MDPROTO_CMD_FLASH_INFO, NULL, 0);
+
+	assert(msg_size > 0);
+
+	if (lock_res = serial_session_mtx_lock(s, INFINITE) < 0)
+		return lock_res;
+
+	if (serial_session_is_open(s))
+		PurgeComm(s->port_handle,
+			PURGE_TXABORT | PURGE_RXABORT | PURGE_TXCLEAR | PURGE_RXCLEAR);
+
+	if (switch_gps_mode(s, s->proto, PROTO_MEMDUMP) < 0) {
+		serial_session_mtx_unlock(s);
+		return -1;
+	}
+
+	if (serial_session_write(s, &cmd, msg_size) < 0) {
+		serial_session_mtx_unlock(s);
+		return -1;
+	}
+
+	if (read_mdproto_pkt(s, &cmd) < 0) {
+		serial_session_mtx_unlock(s);
+		return -1;
+	}
+
+    if (cmd.data.id != MDPROTO_CMD_FLASH_INFO_RESPONSE) {
+		logger_error(TEXT("received wrong response code `0x%x`"), cmd.data.id);
+		serial_session_set_error(s, 0, TEXT("received wrong response code"));
+		serial_session_mtx_unlock(s);
+		return -1;
+	}
+
+	dump_flash_info((struct mdproto_cmd_flash_info_t *)&cmd.data.p[1]);
+	
+	serial_session_set_error(s, 0, NULL);
+	serial_session_mtx_unlock(s);
+	return 0;
+}
+
+
 
 int switch_gps_mode(struct serial_session_t *s, unsigned current, unsigned required)
 {
@@ -1380,3 +1439,4 @@ int switch_gps_mode(struct serial_session_t *s, unsigned current, unsigned requi
 	serial_session_mtx_unlock(s);
 	return res;
 }
+

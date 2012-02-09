@@ -57,6 +57,8 @@
 #define IDM_DUMP_MEM                    32785
 #define ID_Menu                         32786
 #define IDM_CHANGE_GPS_MODE             32787
+#define ID_Menu32788                    32788
+#define IDM_GET_FLASH_INFO              32789
 #define IDM_OK                          40000
 #define IDM_HELP_ABOUT                  40002
 #define IDC_COM_PORT_TEXT               -1
@@ -68,7 +70,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NO_MFC                     1
 #define _APS_NEXT_RESOURCE_VALUE        135
-#define _APS_NEXT_COMMAND_VALUE         32788
+#define _APS_NEXT_COMMAND_VALUE         32790
 #define _APS_NEXT_CONTROL_VALUE         1024
 #define _APS_NEXT_SYMED_VALUE           111
 #endif

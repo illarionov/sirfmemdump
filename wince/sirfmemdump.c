@@ -216,6 +216,11 @@ INT_PTR CALLBACK WndProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 					msg_handled = TRUE;
 					break;
 
+				case IDM_GET_FLASH_INFO:
+					serial_session_req_flash_info(current_session);
+					msg_handled = TRUE;
+					break;
+
                 case IDOK:
 				case IDCANCEL:
 				case IDABORT:
@@ -400,6 +405,8 @@ static int refresh_mainmenu()
 	EnableMenuItem(menu,  IDM_LOADDUMPER, MF_BYCOMMAND | enabled);
 
 	EnableMenuItem(menu,  IDM_PING, MF_BYCOMMAND | enabled);
+	EnableMenuItem(menu,  IDM_GET_FLASH_INFO, MF_BYCOMMAND | enabled);
+	EnableMenuItem(menu,  IDM_CHANGE_GPS_MODE, MF_BYCOMMAND | enabled);
 	EnableMenuItem(menu,  IDM_DUMP_MEM, MF_BYCOMMAND | enabled);
 
 	return 0;

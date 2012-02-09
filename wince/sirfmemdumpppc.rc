@@ -243,6 +243,8 @@ BEGIN
     MENUITEM "COM",                         IDM_COM_PORT
     POPUP "Menu"
     BEGIN
+        MENUITEM "Get Flash info",              IDM_GET_FLASH_INFO
+        MENUITEM SEPARATOR
         MENUITEM "Dump memory",                 IDM_DUMP_MEM
         MENUITEM SEPARATOR
         MENUITEM "Change GPS mode",             IDM_CHANGE_GPS_MODE

@@ -68,7 +68,8 @@ struct serial_session_t {
 	enum {
 		REQUEST_NONE,
 		REQUEST_DUMP,
-		REQUEST_GPS_MODE
+		REQUEST_GPS_MODE,
+		REQUEST_FLASH_INFO
 	} request;
 	
 	union {
@@ -121,6 +122,7 @@ int serial_session_req_dump(struct serial_session_t *s,
 int serial_session_req_change_gps_mode(struct serial_session_t *s,
 									   unsigned from_mode,
 									   unsigned to_mode);
+int serial_session_req_flash_info(struct serial_session_t *s);
 
 /* Serial thread commands */
 int nmea_set_serial_state(struct serial_session_t *s,
@@ -138,6 +140,7 @@ int switch_gps_mode(struct serial_session_t *s, unsigned current, unsigned requi
 int internal_boot_send_loader(struct serial_session_t *s);
 int memdump_cmd_ping(struct serial_session_t *s);
 int memdump_cmd_dump(struct serial_session_t *s);
+int memdump_cmd_get_flash_info(struct serial_session_t *s);
 
 int sirf_is_msg(const BYTE *buf, size_t buf_size);
 int nmea_is_msg(const BYTE *buf, size_t buf_size);

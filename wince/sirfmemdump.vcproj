@@ -401,6 +401,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\flash.c"
+				>
+			</File>
+			<File
 				RelativePath=".\logger.c"
 				>
 			</File>
@@ -468,6 +472,10 @@
 			</File>
 			<File
 				RelativePath=".\stdafx.h"
+				>
+			</File>
+			<File
+				RelativePath=".\stdint.h"
 				>
 			</File>
 		</Filter>

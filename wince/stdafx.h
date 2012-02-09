@@ -65,3 +65,5 @@
 #include <assert.h>
 #include <commdlg.h>
 #include <Winsock.h> /* htons htonl */
+#include "stdint.h"
+
