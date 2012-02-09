@@ -16,16 +16,13 @@
 
 #include "StdAfx.h"
 #include "sirfmemdump.h"
-
+#include "mdproto.h"
 
 extern HINSTANCE			g_hInst;			// current instance
 
 /* serial_session.c */
 int serial_session_set_perror(struct serial_session_t *s, const TCHAR *str);
 int serial_session_set_error(struct serial_session_t *s, int last_err, const TCHAR *str);
-
-/* flash.c */
-int dump_flash_info(const struct mdproto_cmd_flash_info_t *data);
 
 
 /* NMEA/SIRF */
@@ -43,35 +40,8 @@ int dump_flash_info(const struct mdproto_cmd_flash_info_t *data);
 #define BOOST_57600 1
 #define BOOST_115200 2
 
-/* memdump */
-enum mdproto_cmd_t {
-   MDPROTO_CMD_PING               = 'z',
-   MDPROTO_CMD_PING_RESPONSE      = 'Z',
-   MDPROTO_CMD_MEM_READ           = 'x',
-   MDPROTO_CMD_MEM_READ_RESPONSE  = 'X',
-   MDPROTO_CMD_EXEC_CODE_RESPONSE ='Y',
-   MDPROTO_CMD_FLASH_INFO         ='w',
-   MDPROTO_CMD_FLASH_INFO_RESPONSE ='W',
-
-   MDPROTO_STATUS_OK                  = '+',
-   MDPROTO_STATUS_WRONG_CMD           = '?',
-   MDPROTO_STATUS_READ_HEADER_TIMEOUT = '.',
-   MDPROTO_STATUS_READ_DATA_TIMEOUT   = ',',
-   MDPROTO_STATUS_TOO_BIG             = '>',
-   MDPROTO_STATUS_WRONG_CSUM          = '#',
-   MDPROTO_STATUS_WRONG_PARAM         = '-'
-};
-#define MDPROTO_CMD_MAX_RAW_DATA_SIZE 508
-
-struct mdproto_cmd_buf_t {
-   uint16_t size;
-   union {
-      uint8_t id;
-      uint8_t p[512];
-   } data;
-   uint8_t _csum_buf;
-};
-
+/* flash.c */
+int dump_flash_info(const struct mdproto_cmd_flash_info_t *data);
 
 static int nmea_snprintf(BYTE *dst, size_t dst_size, const TCHAR *fmt, ...);
 static int sirf_snprintf(BYTE *dst, size_t dst_size, const TCHAR *fmt, ...);
@@ -87,7 +57,6 @@ static int close_dump_request(struct serial_session_t *s);
 
 
 /* Nmea */
-
 static int nmea_snprintf(BYTE *dst, size_t dst_size, const TCHAR *fmt, ...)
 {
 	unsigned csum;
@@ -1338,6 +1307,14 @@ int memdump_cmd_get_flash_info(struct serial_session_t *s)
 		return -1;
 	}
 
+    if (ntohs(cmd.size) != sizeof(struct mdproto_cmd_flash_info_t)+1) {
+		logger_error(TEXT("received wrong response size `0x%u` != `0x%u`"), (unsigned)ntohs(cmd.size),
+			(unsigned)sizeof(struct mdproto_cmd_flash_info_t)+1
+			);
+	   serial_session_set_error(s, 0, TEXT("received wrong response size"));
+	   serial_session_mtx_unlock(s);
+       return -1;
+    }
 	dump_flash_info((struct mdproto_cmd_flash_info_t *)&cmd.data.p[1]);
 	
 	serial_session_set_error(s, 0, NULL);

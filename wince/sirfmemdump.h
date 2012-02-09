@@ -91,9 +91,8 @@ struct serial_session_t {
 			unsigned to_gps_mode;
 		} gps_mode;
 	} req_ctx;
-	
-
 };
+
 
 struct serial_session_t *serial_session_create(const TCHAR *port, unsigned baudrate);
 void serial_session_destroy(struct serial_session_t *s);
