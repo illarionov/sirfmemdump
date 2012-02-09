@@ -22,7 +22,7 @@
 
 	.text
 	.arm
-	.section .init, "ax"
+	.section .startup, "ax"
 
 	.global _start
 

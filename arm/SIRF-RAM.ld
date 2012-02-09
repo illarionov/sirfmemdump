@@ -51,6 +51,11 @@ SECTIONS
 {
 	/* first section is .text which is used for code */
 
+        .startup : 
+        {
+                KEEP(*(.startup))
+        } > XDATA =0
+
 	.text :
 	{
 		KEEP(*(.init))
@@ -59,7 +64,7 @@ SECTIONS
 		*(.glue_7t .glue_7)
 		KEEP(*(.fini))
 		*(.gcc_except_table)
-	} >XDATA =0
+	} >XDATA
 	. = ALIGN(4);
 
 	/* .rodata section which is used for read-only data (constants) */
