@@ -38,10 +38,18 @@ int dump_flash_info(const struct mdproto_cmd_flash_info_t *data)
       return 0;
    }
 
+   flash_get_name(ntohs(data->manuf_id), ntohs(data->device_id),
+	 &manufacturer, &device_name);
+
+   logger_info(TEXT("Manufacturer: 0x%04x (%s)"),
+	   (unsigned)ntohs(data->manuf_id), manufacturer);	 
+   logger_info(TEXT("Device ID: 0x%04x (%s)"),
+	   (unsigned)ntohs(data->device_id), device_name);
+
    if ( (data->cfi_id_string.q != 'Q')
 	 || (data->cfi_id_string.r != 'R')
 	 || (data->cfi_id_string.y != 'Y')) {
-      logger_error(TEXT("Wrong CFI Query-unique string (QRY): 0x%02x 0x%02x 0x%02x"),
+      logger_error(TEXT("Non-CFI device - wrong CFI Query-unique string (QRY): 0x%02x 0x%02x 0x%02x"),
 	    (unsigned)data->cfi_id_string.q,
 	    (unsigned)data->cfi_id_string.r,
 	    (unsigned)data->cfi_id_string.y
@@ -49,13 +57,6 @@ int dump_flash_info(const struct mdproto_cmd_flash_info_t *data)
       return -1;
    }
 
-   flash_get_name(ntohs(data->manuf_id), ntohs(data->device_id),
-	 &manufacturer, &device_name);
-
-   logger_info(TEXT("Manufactirer: 0x%04x (%s)"),
-	   (unsigned)ntohs(data->manuf_id), manufacturer);	 
-   logger_info(TEXT("Device ID: 0x%04x (%s)"),
-	   (unsigned)ntohs(data->device_id), device_name);
    logger_info(TEXT("Primary vendor command set code: 0x%04x"),
 	   (unsigned)ntohs(data->cfi_id_string.primary_alg_id));
    logger_info(TEXT("Address for primary algotithm extended query table: 0x%04x"),
@@ -159,7 +160,13 @@ static void flash_get_name(unsigned manufacturer_id, unsigned device_id,
 	  case 0x01:
 		  *manufacturer = TEXT("AMD");
 		  switch (device_id) {
-	  default: break;
+				case 0x22b9:
+					*device = TEXT("AM29LV400BT"); /* Spansion S29AL004D top boot block */
+					break;
+				case 0x22ba:
+					*device = TEXT("AM29LV400BB"); /* Spansion S29AL004D bottom boot block */
+					break;
+				default: break;
 		  }
 		  break;
 	  case 0x04:

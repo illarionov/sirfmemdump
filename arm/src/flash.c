@@ -88,9 +88,9 @@ int flash_init()
 	 goto flash_16bit_done;
       }
 
-      /* JEDEC ID request */
-      flash_sdp_unprotect = &flash_sdp_null_unprotect;
-      flash_16b_jedec_id_query();
+      /* JEDEC ID request (on 0 address) */
+      flash_sdp_unprotect();
+      flash[0] = 0x90;
       if (flash[0] == 0x90) {
 	 /* SRAM device */
 	 flash[0]=orig[0];
@@ -99,7 +99,7 @@ int flash_init()
 	 return 0;
       }
 
-      /* JEDEC flash device */
+      /* JEDEC flash device (with SDP) */
 
 flash_16bit_done:
       flash_16b_read_array_mode();
@@ -225,7 +225,7 @@ static void flash_16b_cfi_query(void)
 static void flash_16b_jedec_id_query(void)
 {
    flash_sdp_unprotect();
-   flash[0] = 0x9090; /* Soft ID query */
+   flash[0x5555] = 0x9090; /* Soft ID query */
    wait(500);  /* Wait Tida */
 }
 
