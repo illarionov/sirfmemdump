@@ -55,11 +55,11 @@ int flash_init()
    flash_bus_width = 16;
 
    if(gps_version == GPS3) {
-      volatile uint16_t *unk88010000;
+      volatile uint16_t *unk80010000;
       unsigned v;
 
-      unk88010000 = (uint16_t *)0x80010000;
-      v = (*unk88010000 >> 2) & 0x03;
+      unk80010000 = (uint16_t *)0x80010000;
+      v = (*unk80010000 >> 2) & 0x03;
       if (v == 0x02)
 	 flash_bus_width = 32;
    }

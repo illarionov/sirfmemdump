@@ -97,8 +97,48 @@ int main(void)
 
 		  if (to < from)
 		     status = MDPROTO_STATUS_WRONG_PARAM;
-		  else
-		     write_cmd_response(MDPROTO_CMD_MEM_READ_RESPONSE, (void *)from, to-from+1);
+		  else {
+		     union {
+			uint32_t u32;
+			uint16_t u16[2];
+			uint8_t u8[4];
+		     } __attribute__((packed)) chunk;
+		     unsigned pkt_size, chunk_size;
+
+		     pkt_size = mdproto_pkt_init(&buf, MDPROTO_CMD_MEM_READ_RESPONSE, NULL, 0);
+
+		     /* Alligned read */
+		     while (from <= to) {
+			/* read chunk */
+			if ( ((from % 4) == 0) && ( to-from+1 >= 4 )) {
+			   uint32_t *from_u32 __attribute__((aligned(__alignof__(uint32_t))));
+			   from_u32 = (uint32_t *)from;
+			   chunk_size = 4;
+			   chunk.u32 = *from_u32;
+			}else if ( ((from % 2) == 0) && ( to-from+1 >= 2 )  ) {
+			   uint16_t *from_u16 __attribute__((aligned(__alignof__(uint16_t))));
+			   from_u16 = (uint16_t *)from;
+			   chunk_size = 2;
+			   chunk.u16[0] = *from_u16;
+			}else {
+			   chunk_size=1;
+			   chunk.u8[0] = *(uint8_t *)from;
+			}
+			from += chunk_size;
+
+			/* Append chunk to packet */
+			pkt_size = mdproto_pkt_append(&buf, &chunk.u8[0], chunk_size);
+
+			/* Flush full packet */
+			if (MDPROTO_CMD_SIZE(buf)+8 > MDPROTO_CMD_MAX_RAW_DATA_SIZE) {
+			   uart1_write((void *)&buf, pkt_size);
+			   pkt_size = (unsigned)mdproto_pkt_init(&buf, MDPROTO_CMD_MEM_READ_RESPONSE, NULL, 0);
+			}
+		     } /* while (from <= to) */ 
+
+		     if (MDPROTO_CMD_SIZE(buf) > 0)
+			uart1_write((void *)&buf, pkt_size);
+		  }
 	       }
 	       break;
 	    case MDPROTO_CMD_EXEC_CODE:

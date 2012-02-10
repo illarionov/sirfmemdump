@@ -98,5 +98,7 @@ int mdproto_pkt_init(struct mdproto_cmd_buf_t *buf,
       unsigned raw_data_size);
 
 uint8_t mdproto_pkt_csum(void *buf, size_t size);
+int mdproto_pkt_append(struct mdproto_cmd_buf_t *buf,
+      void *data, unsigned appended_size);
 
 #endif

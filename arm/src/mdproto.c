@@ -55,3 +55,37 @@ uint8_t mdproto_pkt_csum(void *buf, size_t size)
    return (uint8_t)(0 - csum);
 }
 
+int mdproto_pkt_append(struct mdproto_cmd_buf_t *buf,
+      void *data, unsigned appended_size)
+{
+   unsigned i;
+   unsigned payload_size;
+   unsigned new_size;
+   int8_t csum;
+
+   payload_size = MDPROTO_CMD_SIZE(*buf);
+   new_size = payload_size + appended_size;
+
+   if (new_size > MDPROTO_CMD_MAX_RAW_DATA_SIZE)
+      return -1;
+
+   csum = (int8_t)(0 - buf->data.p[payload_size]);
+   csum -= (int8_t)((payload_size >> 8)&0xff);
+   csum -= (int8_t)(payload_size & 0xff);
+   csum += (int8_t)((new_size >> 8)&0xff);
+   csum += (int8_t)(new_size & 0xff);
+
+   for(i=0; i<appended_size; i++) {
+      buf->data.p[payload_size+i] = ((uint8_t *)data)[i];
+      csum += ((uint8_t *)data)[i];
+   }
+
+   buf->size = (new_size << 8) | (new_size >> 8);
+   buf->data.p[new_size] = (uint8_t)(0-csum);
+
+   return new_size+3;
+}
+
+
+
+
