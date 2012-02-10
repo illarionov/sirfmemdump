@@ -580,7 +580,14 @@ static void flash_get_name(unsigned manufacturer_id, unsigned device_id,
       case 0x01:
 	 *manufacturer = "AMD";
 	 switch (device_id) {
-	    default: break;
+	    case 0x22b9:
+	       *device = "AM29LV400BT"; /*  Spansion S29AL004D top boot block */
+	       break;
+	    case 0x22ba:
+	       *device = "AM29LV400BB"; /*  Spansion S29AL004D bottom boot block */
+	       break;
+	    default:
+	       break;
 	 }
 	 break;
       case 0x04:
@@ -685,10 +692,20 @@ static int dump_flash_info(const struct mdproto_cmd_flash_info_t *data)
       return 0;
    }
 
+   flash_get_name(ntohs(data->manuf_id), ntohs(data->device_id),
+	 &manufacturer, &device_name);
+
+   printf(
+	 "Manufacturer: 0x%04x (%s)\n"
+	 "Device ID: 0x%04x (%s)\n",
+	 (unsigned)ntohs(data->manuf_id), manufacturer,
+	 (unsigned)ntohs(data->device_id), device_name
+   );
+
    if ( (data->cfi_id_string.q != 'Q')
 	 || (data->cfi_id_string.r != 'R')
 	 || (data->cfi_id_string.y != 'Y')) {
-      gpsd_report(LOG_PROG, "Wrong CFI Query-unique string (QRY): 0x%2x 0x%2x 0x%2x\n",
+      gpsd_report(LOG_PROG, "Non-CFI device or wrong CFI Query-unique string (QRY): 0x%2x 0x%2x 0x%2x\n",
 	    data->cfi_id_string.q,
 	    data->cfi_id_string.r,
 	    data->cfi_id_string.y
@@ -696,18 +713,11 @@ static int dump_flash_info(const struct mdproto_cmd_flash_info_t *data)
       return -1;
    }
 
-   flash_get_name(ntohs(data->manuf_id), ntohs(data->device_id),
-	 &manufacturer, &device_name);
-
    printf(
-	 "Manufactirer: 0x%04x (%s)\n"
-	 "Device ID: 0x%04x (%s)\n"
 	 "Primary vendor command set code: 0x%04x\n"
 	 "Address for primary algotithm extended query table: 0x%04x\n"
 	 "Alternate vendor command set code: 0x%04x\n"
 	 "Address for alternate algorithm extended query table: 0x%04x\n",
-	 (unsigned)ntohs(data->manuf_id), manufacturer,
-	 (unsigned)ntohs(data->device_id), device_name,
 	 (unsigned)ntohs(data->cfi_id_string.primary_alg_id),
 	 (unsigned)ntohs(data->cfi_id_string.primary_alg_tbl),
 	 (unsigned)ntohs(data->cfi_id_string.secondary_alg_id),
