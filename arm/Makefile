@@ -31,11 +31,11 @@ PROGRAM_VERSION := $(shell git describe)
 
 # List C source files here. (C dependencies are automatically generated.)
 # use file-extension c for "c-only"-files
-SRC  = src/$(TARGET).c
+SRC  = src/$(TARGET).c src/uart.c src/mdproto.c src/flash.c
 
 # List C source files here which must be compiled in ARM-Mode.
 # use file-extension c for "c-only"-files
-SRCARM  = src/uart.c src/mdproto.c src/flash.c
+SRCARM  =
 
 # List C++ source files here.
 # use file-extension cpp for C++-files (use extension .cpp)
