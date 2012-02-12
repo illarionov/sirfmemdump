@@ -32,6 +32,9 @@ static void flash_sdp_16b_unprotect(void);
 static void flash_16b_cfi_query(void);
 static void flash_16b_jedec_id_query(void);
 static void flash_16b_read_array_mode(void);
+static int flash_16b_program_word(unsigned addr, uint16_t word);
+int flash_16b_erase_sector(unsigned addr);
+int flash_16b_program(unsigned addr, void *buf, unsigned size);
 
 static volatile uint16_t *flash __attribute__((aligned(__alignof__(uint16_t))));
 static volatile unsigned flash_bus_width = 16;
@@ -193,6 +196,29 @@ int flash_get_info(struct mdproto_cmd_flash_info_t *dst)
    return 1;
 }
 
+
+int flash_16b_program(unsigned addr, void *buf, unsigned size)
+{
+   uint8_t *buf_u8;
+   uint16_t word;
+   int res, r0;
+   unsigned written;
+
+   res = 0;
+   buf_u8=(uint8_t *)buf;
+   for (written=0; written<size; written+=2) {
+      word = (uint16_t)buf_u8[addr+written]
+	 | (uint16_t)buf_u8[addr+written+1] << 8;
+      r0 = flash_16b_program_word(addr, word);
+      /* do not break on errors */
+      if (res == 0)
+	 res = r0;
+   }
+
+   return res;
+}
+
+
 /* 98h CFI query */
 static void flash_16b_cfi_query(void)
 {
@@ -228,6 +254,43 @@ static void flash_sdp_16b_unprotect()
 static void flash_sdp_null_unprotect()
 {
    return;
+}
+
+static int flash_16b_program_word(unsigned addr, uint16_t word)
+{
+   unsigned i;
+
+   flash_sdp_unprotect();
+   flash[0x5555]=0x00a0;
+   flash[addr]=word;
+
+   i=0;
+
+   /* DQ7 */
+   while (flash[addr]!= word){
+      if (++i==50000)
+	 return -1;
+   }
+
+   return (flash[addr]==word) ? 0 : -2;
+}
+
+int flash_16b_erase_sector(unsigned addr)
+{
+   unsigned i;
+
+   flash_sdp_unprotect();
+   flash[0x5555]=0x80;
+   flash_sdp_unprotect();
+   flash[addr]=0x30;
+
+   i=0;
+   while(flash[addr]!=0xffff) {
+      if(++i==5000)
+	 return -1;
+   }
+
+   return flash[addr]=0xffff ? 0 : -2;
 }
 
 

@@ -59,6 +59,8 @@ static struct mdproto_cmd_buf_t buf;
 /* flash.c  */
 int flash_init(void);
 int flash_get_info(struct mdproto_cmd_flash_info_t *dst);
+int flash_16b_erase_sector(unsigned addr);
+int flash_16b_program(unsigned addr, void *buf, unsigned size);
 
 int main(void)
 {
@@ -153,13 +155,17 @@ int main(void)
 		  } src;
 		  uint32_t dst[4];
 
+		  /* function address */
 		  f_p = (buf.data.p[1] << 24)
 		     | (buf.data.p[2] << 16)
 		     | (buf.data.p[3] << 8)
 		     | (buf.data.p[4]);
 
+		  /* r0, r1, r2, r3 */
 		  for(i=0; i<4*4; i++)
 		     src.u8[i] = buf.data.p[5+i];
+
+		  /* result */
 		  dst[0] = 0xdeadc0de;
 		  dst[1] = 0xdeadc0de;
 		  dst[2] = 0xdeadc0de;
@@ -185,6 +191,45 @@ int main(void)
 		  write_cmd_response(MDPROTO_CMD_FLASH_INFO_RESPONSE, (void *)&response, sizeof(response));
 	       }
 	       break;
+	    case MDPROTO_CMD_FLASH_ERASE_SECTOR:
+	       if (MDPROTO_CMD_SIZE(buf) != 4+1)
+		  status = MDPROTO_STATUS_WRONG_PARAM;
+	       else {
+		  unsigned addr;
+		  int8_t  res;
+
+		  /* erased sector address */
+		  addr = (buf.data.p[1] << 24)
+		     | (buf.data.p[2] << 16)
+		     | (buf.data.p[3] << 8)
+		     | (buf.data.p[4]);
+
+		  res =  (int8_t)flash_16b_erase_sector(addr);
+		  write_cmd_response(MDPROTO_CMD_FLASH_ERASE_SECTOR_RESPONSE, (void *)&res, sizeof(res));
+	       }
+	       break;
+	    case MDPROTO_CMD_FLASH_PROGRAM:
+	       if (MDPROTO_CMD_SIZE(buf) < 4+1+2)
+		  status = MDPROTO_STATUS_WRONG_PARAM;
+	       else {
+		  unsigned addr;
+		  void *data;
+		  unsigned data_size;
+		  int8_t res;
+
+		  /* destination address */
+		  addr = (buf.data.p[1] << 24)
+		     | (buf.data.p[2] << 16)
+		     | (buf.data.p[3] << 8)
+		     | (buf.data.p[4]);
+
+		  data = (void *)&buf.data.p[5];
+		  data_size = MDPROTO_CMD_SIZE(buf)-4-1;
+
+		  res = (int8_t)flash_16b_program(addr, data, data_size);
+		  write_cmd_response(MDPROTO_CMD_FLASH_PROGRAM_RESPONSE, (void *)&res, sizeof(res));
+
+	       }
 	    default:
 	       status = MDPROTO_STATUS_WRONG_CMD;
 	       break;

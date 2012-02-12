@@ -28,6 +28,10 @@ enum mdproto_cmd_t {
    MDPROTO_CMD_EXEC_CODE_RESPONSE ='Y',
    MDPROTO_CMD_FLASH_INFO         ='w',
    MDPROTO_CMD_FLASH_INFO_RESPONSE ='W',
+   MDPROTO_CMD_FLASH_PROGRAM          ='v',
+   MDPROTO_CMD_FLASH_PROGRAM_RESPONSE  ='V',
+   MDPROTO_CMD_FLASH_ERASE_SECTOR     = 'u',
+   MDPROTO_CMD_FLASH_ERASE_SECTOR_RESPONSE = 'U',
 
    MDPROTO_STATUS_OK = '+',
    MDPROTO_STATUS_WRONG_CMD = '?',
@@ -91,6 +95,8 @@ struct mdproto_cmd_flash_info_t {
    }  __attribute__((packed)) flash_geometry;
 
 } __attribute__((packed));
+
+
 
 int mdproto_pkt_init(struct mdproto_cmd_buf_t *buf,
       unsigned cmd_id,
