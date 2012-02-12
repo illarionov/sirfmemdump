@@ -111,12 +111,12 @@ int main(void)
 		     while (from <= to) {
 			/* read chunk */
 			if ( ((from % 4) == 0) && ( to-from+1 >= 4 )) {
-			   uint32_t *from_u32 __attribute__((aligned(__alignof__(uint32_t))));
+			   uint32_t volatile *from_u32 __attribute__((aligned(__alignof__(uint32_t))));
 			   from_u32 = (uint32_t *)from;
 			   chunk_size = 4;
 			   chunk.u32 = *from_u32;
 			}else if ( ((from % 2) == 0) && ( to-from+1 >= 2 )  ) {
-			   uint16_t *from_u16 __attribute__((aligned(__alignof__(uint16_t))));
+			   uint16_t volatile *from_u16 __attribute__((aligned(__alignof__(uint16_t))));
 			   from_u16 = (uint16_t *)from;
 			   chunk_size = 2;
 			   chunk.u16[0] = *from_u16;
