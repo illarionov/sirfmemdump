@@ -113,36 +113,16 @@ int flash_get_info(struct mdproto_cmd_flash_info_t *dst)
 {
    unsigned i, max_erase_block, eblock_addr;
 
+   /* bzero() dst */
+   for(i=0; i<sizeof(*dst); i++)
+      ((uint8_t *)dst)[i]=0;
+
    dst->manuf_id = 0xffff;
    dst->device_id = 0xffff;
 
    dst->cfi_id_string.q = 0xff;
    dst->cfi_id_string.r = 0xff;
    dst->cfi_id_string.y = 0xff;
-   dst->cfi_id_string.primary_alg_id = 0;
-   dst->cfi_id_string.primary_alg_tbl = 0;
-   dst->cfi_id_string.secondary_alg_id = 0;
-   dst->cfi_id_string.secondary_alg_tbl = 0;
-
-   dst->interface_info.vcc_min = 0;
-   dst->interface_info.vcc_max = 0;
-   dst->interface_info.vpp_min = 0;
-   dst->interface_info.vpp_max = 0;
-   dst->interface_info.word_write_tmout  = 0;
-   dst->interface_info.buf_write_tmout   = 0;
-   dst->interface_info.block_erase_tmout = 0;
-   dst->interface_info.chip_erase_tmout  = 0;
-   dst->interface_info.max_word_write_tmout  = 0;
-   dst->interface_info.max_buf_write_tmout   = 0;
-   dst->interface_info.max_block_erase_tmout = 0;
-   dst->interface_info.max_chip_erase_tmout  = 0;
-
-   dst->flash_geometry.size = 0;
-   dst->flash_geometry.interface_desc = 0;
-   dst->flash_geometry.max_write_buf_size = 0;
-   dst->flash_geometry.num_erase_blocks = 0;
-   for(i=0; i<sizeof(dst->flash_geometry.erase_blocks)/sizeof(dst->flash_geometry.erase_blocks[0]);i++)
-      dst->flash_geometry.erase_blocks[i]=0;
 
    /* unsupported */
    if (flash_bus_width != 16)
