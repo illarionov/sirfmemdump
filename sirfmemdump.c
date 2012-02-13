@@ -52,6 +52,8 @@ static ssize_t read_full(int d, void *buf, size_t nbytes);
 static int dump_flash_info(const struct mdproto_cmd_flash_info_t *data);
 static void flash_get_name(unsigned manufacturer_id, unsigned device_id,
       const char **manufacturer, const char **device);
+static int cmd_erase_sector(int pfd, unsigned addr);
+static int cmd_program_flash(int pfd, unsigned addr, const char *fname);
 
 void gpsd_report(int errlevel, const char *fmt, ... )
 /* assemble command in printf(3) style, use stderr or syslog */
@@ -99,6 +101,8 @@ static void help(void)
    "    dump {src_addr} {dst_addr}           Dump memory\n"
    "    exec {f_addr} {R0} {R1} {R2} {R4}    Execute function f_addr\n"
    "    flash-info                           Print flash info\n"
+   "    erase-sector {addr}                  Erase flash sector\n"
+   "    program {addr} {file}                Program flash\n"
    "\n"
  );
  return;
@@ -567,6 +571,54 @@ int cmd_flash_info(int pfd)
   return 0;
 }
 
+static int cmd_erase_sector(int pfd, unsigned addr)
+{
+  unsigned read_status;
+  int write_size;
+  int8_t res;
+  struct mdproto_cmd_buf_t cmd;
+
+  write_size = mdproto_pkt_init(&cmd, MDPROTO_CMD_FLASH_ERASE_SECTOR, NULL, 0);
+  gpsd_report(LOG_PROG, "FLASH-ERASE 0x%x...\n", addr);
+
+  tcflush(pfd, TCIOFLUSH);
+  usleep(10000);
+  if (write(pfd, (void *)&cmd, write_size) < write_size) {
+     gpsd_report(LOG_PROG, "write() error\n");
+     return 1;
+  }
+
+  read_status = read_mdproto_pkt(pfd, &cmd);
+  if (read_status != MDPROTO_STATUS_OK) {
+     gpsd_report(LOG_PROG, "read_mdproto_pkt() error `%c`\n", read_status);
+     return 1;
+  }
+
+  if (cmd.data.id != MDPROTO_CMD_FLASH_ERASE_SECTOR_RESPONSE) {
+     gpsd_report(LOG_PROG, "received wrong response code `0x%x`\n", cmd.data.id);
+     return 1;
+  }
+
+  if (ntohs(cmd.size) != 1+1) {
+     gpsd_report(LOG_PROG, "received wrong response size `0x%x`\n", ntohs(cmd.size));
+     return 1;
+  }
+
+  res = (int8_t)cmd.data.p[1];
+  if (res==0) {
+     gpsd_report(LOG_PROG, "OK\n");
+  }else {
+     gpsd_report(LOG_PROG, "error %i\n", (int)res);
+  }
+
+  return (int)res;
+}
+
+static int cmd_program_flash(int pfd, unsigned addr, const char *fname)
+{
+   return 0;
+}
+
 static void flash_get_name(unsigned manufacturer_id, unsigned device_id,
       const char **manufacturer, const char **device)
 {
@@ -950,6 +1002,43 @@ main(int argc, char **argv){
 	   }else if (strcasecmp(argv[argnum], "flash-info") == 0) {
 	      argnum++;
 	      res = cmd_flash_info(pfd);
+	      if (res != 0)
+		 break;
+	   }else if (strcasecmp(argv[argnum], "erase-sector") == 0) {
+	      unsigned addr;
+	      char *endptr;
+
+	      if ((argc < 2)
+		    || (*argv[argnum+1]=='\0')) {
+		 gpsd_report(LOG_ERROR, "address not defined\n");
+		 break;
+	      }
+
+	      addr = strtoul(argv[argnum+1], &endptr, 0);
+	      if (*endptr != '\0') {
+		 gpsd_report(LOG_ERROR, "malformed %s `%s`\n", "addr", argv[argc+1]);
+		 break;
+	      }
+	      res = cmd_erase_sector(pfd, addr);
+	      if (res != 0)
+		 break;
+	   }else if (strcasecmp(argv[argnum], "program") == 0) {
+	      unsigned addr;
+	      char *endptr;
+
+	      if ((argc < 1+2)
+		    || (*argv[argnum+1]=='\0')
+		    ) {
+		 gpsd_report(LOG_ERROR, "address/filename not defined\n");
+		 break;
+	      }
+
+	      addr = strtoul(argv[argnum+1], &endptr, 0);
+	      if (*endptr != '\0') {
+		 gpsd_report(LOG_ERROR, "malformed %s `%s`\n", "addr", argv[argc+1]);
+		 break;
+	      }
+	      res = cmd_program_flash(addr, addr, argv[argnum+2]);
 	      if (res != 0)
 		 break;
 	   }else {
