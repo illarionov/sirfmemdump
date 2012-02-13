@@ -204,7 +204,7 @@ int main(void)
 		     | (buf.data.p[3] << 8)
 		     | (buf.data.p[4]);
 
-		  res =  (int8_t)flash_16b_erase_sector(addr);
+		  res =  (int8_t)flash_16b_erase_sector(addr/2);
 		  write_cmd_response(MDPROTO_CMD_FLASH_ERASE_SECTOR_RESPONSE, (void *)&res, sizeof(res));
 	       }
 	       break;
@@ -226,10 +226,10 @@ int main(void)
 		  data = (void *)&buf.data.p[5];
 		  data_size = MDPROTO_CMD_SIZE(buf)-4-1;
 
-		  res = (int8_t)flash_16b_program(addr, data, data_size);
+		  res = (int8_t)flash_16b_program(addr/2, data, data_size/2);
 		  write_cmd_response(MDPROTO_CMD_FLASH_PROGRAM_RESPONSE, (void *)&res, sizeof(res));
-
 	       }
+	       break;
 	    default:
 	       status = MDPROTO_STATUS_WRONG_CMD;
 	       break;

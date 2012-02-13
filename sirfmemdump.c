@@ -53,7 +53,7 @@ static int dump_flash_info(const struct mdproto_cmd_flash_info_t *data);
 static void flash_get_name(unsigned manufacturer_id, unsigned device_id,
       const char **manufacturer, const char **device);
 static int cmd_erase_sector(int pfd, unsigned addr);
-static int cmd_program_flash(int pfd, unsigned addr, const char *fname);
+static int cmd_program_word(int pfd, unsigned addr, uint16_t word);
 
 void gpsd_report(int errlevel, const char *fmt, ... )
 /* assemble command in printf(3) style, use stderr or syslog */
@@ -101,8 +101,8 @@ static void help(void)
    "    dump {src_addr} {dst_addr}           Dump memory\n"
    "    exec {f_addr} {R0} {R1} {R2} {R4}    Execute function f_addr\n"
    "    flash-info                           Print flash info\n"
-   "    erase-sector {addr}                  Erase flash sector\n"
-   "    program {addr} {file}                Program flash\n"
+   "    erase-sector {flash_addr}            Erase flash sector\n"
+   "    program-word {flash_addr} {word}     Program one word\n"
    "\n"
  );
  return;
@@ -576,9 +576,11 @@ static int cmd_erase_sector(int pfd, unsigned addr)
   unsigned read_status;
   int write_size;
   int8_t res;
+  uint32_t addr_ui32;
   struct mdproto_cmd_buf_t cmd;
 
-  write_size = mdproto_pkt_init(&cmd, MDPROTO_CMD_FLASH_ERASE_SECTOR, NULL, 0);
+  addr_ui32 = ntohl((uint32_t)addr);
+  write_size = mdproto_pkt_init(&cmd, MDPROTO_CMD_FLASH_ERASE_SECTOR, &addr_ui32, sizeof(addr_ui32));
   gpsd_report(LOG_PROG, "FLASH-ERASE 0x%x...\n", addr);
 
   tcflush(pfd, TCIOFLUSH);
@@ -614,9 +616,55 @@ static int cmd_erase_sector(int pfd, unsigned addr)
   return (int)res;
 }
 
-static int cmd_program_flash(int pfd, unsigned addr, const char *fname)
+static int cmd_program_word(int pfd, unsigned addr, uint16_t word)
 {
-   return 0;
+  int8_t res;
+  int write_size;
+  int read_status;
+  struct {
+     uint32_t addr;
+     uint16_t payload;
+  } __packed t_req;
+  struct mdproto_cmd_buf_t cmd;
+
+  gpsd_report(LOG_PROG, "FLASH-PROGRAM 0x%x = 0x%04x...\n", addr, (unsigned)word);
+
+  t_req.addr = ntohl((uint32_t)addr);
+  t_req.payload = htons(word);
+  write_size = mdproto_pkt_init(&cmd, MDPROTO_CMD_FLASH_PROGRAM,
+   &t_req, sizeof(t_req));
+
+  tcflush(pfd, TCIOFLUSH);
+  usleep(10000);
+  if (write(pfd, (void *)&cmd, write_size) < write_size) {
+     gpsd_report(LOG_PROG, "write() error\n");
+     return 1;
+  }
+
+  read_status = read_mdproto_pkt(pfd, &cmd);
+  if (read_status != MDPROTO_STATUS_OK) {
+     gpsd_report(LOG_PROG, "read_mdproto_pkt() error `%c`\n", read_status);
+     return 1;
+  }
+
+  if (cmd.data.id != MDPROTO_CMD_FLASH_PROGRAM_RESPONSE) {
+     gpsd_report(LOG_PROG, "received wrong response code `0x%x`\n", cmd.data.id);
+     return 1;
+  }
+
+  if (ntohs(cmd.size) != 1+1) {
+     gpsd_report(LOG_PROG, "received wrong response size `0x%x`\n", ntohs(cmd.size));
+     return 1;
+  }
+
+  res = (int8_t)cmd.data.p[1];
+  if (res==0) {
+     gpsd_report(LOG_PROG, "OK\n");
+  }else {
+     gpsd_report(LOG_PROG, "error %i\n", (int)res);
+  }
+
+  return (int)res;
 }
 
 static void flash_get_name(unsigned manufacturer_id, unsigned device_id,
@@ -1022,8 +1070,9 @@ main(int argc, char **argv){
 	      res = cmd_erase_sector(pfd, addr);
 	      if (res != 0)
 		 break;
-	   }else if (strcasecmp(argv[argnum], "program") == 0) {
-	      unsigned addr;
+	      argnum += 2;
+	   }else if (strcasecmp(argv[argnum], "program-word") == 0) {
+	      unsigned addr, word;
 	      char *endptr;
 
 	      if ((argc < 1+2)
@@ -1038,9 +1087,16 @@ main(int argc, char **argv){
 		 gpsd_report(LOG_ERROR, "malformed %s `%s`\n", "addr", argv[argc+1]);
 		 break;
 	      }
-	      res = cmd_program_flash(addr, addr, argv[argnum+2]);
+	      word = strtoul(argv[argnum+2], &endptr, 0);
+	      if (*endptr != '\0') {
+		 gpsd_report(LOG_ERROR, "malformed %s `%s`\n", "word", argv[argc+1]);
+		 break;
+	      }
+
+	      res = cmd_program_word(pfd, addr, word&0xffff);
 	      if (res != 0)
 		 break;
+	      argnum += 1+2;
 	   }else {
 	      gpsd_report(LOG_ERROR, "unknown command `%s`\n", argv[argnum]);
 	      break;

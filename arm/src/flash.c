@@ -206,10 +206,10 @@ int flash_16b_program(unsigned addr, void *buf, unsigned size)
 
    res = 0;
    buf_u8=(uint8_t *)buf;
-   for (written=0; written<size; written+=2) {
-      word = (uint16_t)buf_u8[addr+written]
-	 | (uint16_t)buf_u8[addr+written+1] << 8;
-      r0 = flash_16b_program_word(addr, word);
+   for (written=0; written<size; ++written) {
+      word = (uint16_t)buf_u8[2*written]
+	 | (uint16_t)buf_u8[2*written+1] << 8;
+      r0 = flash_16b_program_word(addr+written, word);
       /* do not break on errors */
       if (res == 0)
 	 res = r0;
@@ -258,15 +258,14 @@ static void flash_sdp_null_unprotect()
 
 static int flash_16b_program_word(unsigned addr, uint16_t word)
 {
-   unsigned i;
+   unsigned volatile i;
 
    flash_sdp_unprotect();
-   flash[0x5555]=0x00a0;
+   flash[0x5555]=0xa0;
    flash[addr]=word;
 
    i=0;
 
-   /* DQ7 */
    while (flash[addr]!= word){
       if (++i==50000)
 	 return -1;
@@ -277,7 +276,7 @@ static int flash_16b_program_word(unsigned addr, uint16_t word)
 
 int flash_16b_erase_sector(unsigned addr)
 {
-   unsigned i;
+   unsigned volatile i;
 
    flash_sdp_unprotect();
    flash[0x5555]=0x80;
@@ -286,11 +285,11 @@ int flash_16b_erase_sector(unsigned addr)
 
    i=0;
    while(flash[addr]!=0xffff) {
-      if(++i==5000)
+      if(++i>=50000)
 	 return -1;
    }
 
-   return flash[addr]=0xffff ? 0 : -2;
+   return flash[addr]==0xffff ? 0 : -2;
 }
 
 
