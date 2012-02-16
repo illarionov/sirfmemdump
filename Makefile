@@ -19,8 +19,14 @@ flashutils.o: flashutils.c flashutils.h
 mdproto.o: arm/include/mdproto.h arm/src/mdproto.c
 	$(CC) $(CFLAGS) -c arm/src/mdproto.c
 
-sirfmemdump: sirfmemdump.bin flashutils.o mdproto.o flashutils.h sirfmemdump.c
-	$(CC) $(CFLAGS) $(LDFLAGS) flashutils.o mdproto.o sirfmemdump.c \
+flash.o: arm/include/mdproto.h flash.c
+	$(CC) $(CFLAGS) -c flash.c
+
+serial.o: arm/include/mdproto.h serial.c
+	$(CC) $(CFLAGS) -c serial.c
+
+sirfmemdump: sirfmemdump.bin flashutils.o mdproto.o flash.o serial.o flashutils.h sirfmemdump.c
+	$(CC) $(CFLAGS) $(LDFLAGS) flashutils.o mdproto.o flash.o serial.o sirfmemdump.c \
 	-o sirfmemdump
 
 clean:
