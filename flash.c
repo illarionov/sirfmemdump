@@ -19,15 +19,56 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <assert.h>
+#include <fcntl.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 
 #include "flashutils.h"
 #include "arm/include/mdproto.h"
+
+#define FLASH_MAX_ERASE_BLOCK_NUM 10
+
+/* XXX */
+#define EXT_SRAM_CSN0 0x40000000
+
+struct flash_erase_block_t {
+   unsigned blocks;
+   unsigned bytes;
+};
+
+const struct {
+   unsigned manuf_id;
+   unsigned device_id;
+   const char *manuf_name;
+   const char *dev_name;
+   struct flash_erase_block_t map[FLASH_MAX_ERASE_BLOCK_NUM];
+} FLASH_LIST[] = {
+   {
+      /* Spansion S29AL004D bottom boot block  */
+      0x22b9, 0x22ba, "Spansion", "AM29LV400BB",
+      { {1, 16384}, {2, 8192}, {1, 32768}, {7, 65536}, {0, 0}  }
+   }//,
+//   {
+      /* SST SST39VF1601 */
+//      0xbf, 0x234b, "SST", "SST39VF1601",
+//      { {512, 4096}, {0,0} }
+//   }
+};
+
+static int flash_get_eblock_map(struct mdproto_cmd_flash_info_t *flash_info,
+      struct flash_erase_block_t *res);
+static unsigned flash_size_from_emap(struct flash_erase_block_t *map);
+static unsigned flash_max_eblock_size(struct flash_erase_block_t *map);
+static struct flash_erase_block_t *flash_eblock_by_idx(struct flash_erase_block_t *map, unsigned i);
+static struct flash_erase_block_t *flash_eblock_by_addr(struct flash_erase_block_t *map, unsigned addr);
+
+static int dump_mem(int pfd, unsigned src_addr, unsigned size, uint8_t *res);
+static int program_sector(int pfd, unsigned addr, uint8_t *data, unsigned data_size);
 
 
 void flash_get_name(unsigned manufacturer_id, unsigned device_id,
@@ -276,10 +317,10 @@ int dump_flash_info(const struct mdproto_cmd_flash_info_t *data)
    return 1;
 }
 
-int cmd_flash_info(int pfd)
+static int get_flash_info(int pfd, struct mdproto_cmd_flash_info_t *res)
 {
-  unsigned read_status;
   int write_size;
+  unsigned read_status;
   struct mdproto_cmd_buf_t cmd;
 
   write_size = mdproto_pkt_init(&cmd, MDPROTO_CMD_FLASH_INFO, NULL, 0);
@@ -289,27 +330,84 @@ int cmd_flash_info(int pfd)
   usleep(10000);
   if (write(pfd, (void *)&cmd, write_size) < write_size) {
      gpsd_report(LOG_PROG, "write() error\n");
-     return 1;
+     return -1;
   }
 
   read_status = read_mdproto_pkt(pfd, &cmd);
   if (read_status != MDPROTO_STATUS_OK) {
      gpsd_report(LOG_PROG, "read_mdproto_pkt() error `%c`\n", read_status);
-     return 1;
+     return -1;
   }
 
   if (cmd.data.id != MDPROTO_CMD_FLASH_INFO_RESPONSE) {
      gpsd_report(LOG_PROG, "received wrong response code `0x%x`\n", cmd.data.id);
-     return 1;
+     return -1;
   }
 
   if (ntohs(cmd.size) != sizeof(struct mdproto_cmd_flash_info_t)+1) {
      gpsd_report(LOG_PROG, "received wrong response size `0x%x`\n", ntohs(cmd.size));
+     return -1;
+  }
+
+  memcpy(res, &cmd.data.p[1], sizeof(*res));
+
+  return 0;
+}
+
+static int dump_mem(int pfd, unsigned src_addr, unsigned size, uint8_t *res)
+{
+  unsigned read_status;
+  int write_size;
+  int cur_size;
+  unsigned dst_addr;
+  struct mdproto_cmd_buf_t cmd;
+  struct {
+     uint32_t src;
+     uint32_t dst;
+  } __attribute__((packed)) req;
+
+
+  dst_addr = src_addr+size-1;
+  req.src = htonl(src_addr);
+  req.dst = htonl(dst_addr);
+  write_size = mdproto_pkt_init(&cmd, MDPROTO_CMD_MEM_READ, &req, sizeof(req));
+
+  tcflush(pfd, TCIOFLUSH);
+  if (write(pfd, (void *)&cmd, write_size) < write_size) {
+     gpsd_report(LOG_PROG, "write() error\n");
      return 1;
   }
 
+  while (src_addr <= dst_addr) {
+     read_status = read_mdproto_pkt(pfd, &cmd);
+     if (read_status != MDPROTO_STATUS_OK) {
+	gpsd_report(LOG_PROG, "read_mdproto_pkt() error `%c`\n", read_status);
+	return 1;
+     }
+     if (cmd.data.id != MDPROTO_CMD_MEM_READ_RESPONSE) {
+	gpsd_report(LOG_PROG, "received wrong response code `0x%x`\n", cmd.data.id);
+	return 1;
+     }
+     cur_size = ntohs(cmd.size) - 1;
+     if (src_addr+cur_size > dst_addr)
+	cur_size = dst_addr - src_addr + 1;
+     memcpy(res, &cmd.data.p[1], cur_size);
+     res += cur_size;
+     src_addr += cur_size;
+  }
 
-  dump_flash_info((struct mdproto_cmd_flash_info_t *)&cmd.data.p[1]);
+  return 0;
+}
+
+
+int cmd_flash_info(int pfd)
+{
+  struct mdproto_cmd_flash_info_t flash_info;
+
+  if (get_flash_info(pfd, &flash_info) != 0)
+     return 1;
+
+  dump_flash_info(&flash_info);
 
   return 0;
 }
@@ -326,7 +424,6 @@ int cmd_erase_sector(int pfd, unsigned addr)
   write_size = mdproto_pkt_init(&cmd, MDPROTO_CMD_FLASH_ERASE_SECTOR, &addr_ui32, sizeof(addr_ui32));
   gpsd_report(LOG_PROG, "FLASH-ERASE 0x%x...\n", addr);
 
-  usleep(10000);
   tcflush(pfd, TCIOFLUSH);
   if (write(pfd, (void *)&cmd, write_size) < write_size) {
      gpsd_report(LOG_PROG, "write() error\n");
@@ -357,6 +454,87 @@ int cmd_erase_sector(int pfd, unsigned addr)
   }
 
   return (int)res;
+}
+
+static int program_sector(int pfd, unsigned addr, uint8_t *data, unsigned data_size)
+{
+  int res;
+  int write_size;
+  int read_status;
+  unsigned chunk_size;
+  struct {
+     uint32_t addr;
+     uint8_t payload[MDPROTO_CMD_MAX_RAW_DATA_SIZE-4];
+  } __packed t_req;
+  struct mdproto_cmd_buf_t cmd;
+
+  assert((sizeof(t_req.payload) % 4) == 0);
+  assert(sizeof(t_req.payload) >= 4);
+
+  res = cmd_erase_sector(pfd, addr);
+  if (res != 0)
+     return res;
+
+  while (data_size != 0) {
+
+     t_req.addr = ntohl((uint32_t)addr);
+
+     if (data_size >= sizeof(t_req.payload)) {
+	chunk_size = sizeof(t_req.payload);
+	memcpy(t_req.payload, data, chunk_size);
+	gpsd_report(LOG_PROG, "programming %-08x: %u bytes\n", addr, chunk_size);
+
+	write_size = mdproto_pkt_init(&cmd, MDPROTO_CMD_FLASH_PROGRAM,
+	      &t_req, sizeof(t_req));
+	data_size -= chunk_size;
+	addr += chunk_size;
+	data += chunk_size;
+     }else {
+	chunk_size = data_size;
+	memcpy(t_req.payload, data, chunk_size);
+	gpsd_report(LOG_PROG, "programming %-08x: %u bytes\n", addr, chunk_size);
+
+	addr += chunk_size;
+	data_size = 0;
+
+	if (chunk_size % 2)
+	   t_req.payload[chunk_size++] = 0xff;
+	write_size = mdproto_pkt_init(&cmd, MDPROTO_CMD_FLASH_PROGRAM,
+	      &t_req, chunk_size+4);
+     }
+
+
+     tcflush(pfd, TCIOFLUSH);
+     if (write(pfd, (void *)&cmd, write_size) < write_size) {
+	gpsd_report(LOG_PROG, "write() error\n");
+	return 1;
+     }
+
+     read_status = read_mdproto_pkt(pfd, &cmd);
+     if (read_status != MDPROTO_STATUS_OK) {
+	gpsd_report(LOG_PROG, "read_mdproto_pkt() error `%c`\n", read_status);
+	return 1;
+     }
+
+     if (cmd.data.id != MDPROTO_CMD_FLASH_PROGRAM_RESPONSE) {
+	gpsd_report(LOG_PROG, "received wrong response code `0x%x`\n", cmd.data.id);
+	return 1;
+     }
+
+     if (ntohs(cmd.size) != 1+1) {
+	gpsd_report(LOG_PROG, "received wrong response size `0x%x`\n", ntohs(cmd.size));
+	return 1;
+     }
+
+     res = (int8_t)cmd.data.p[1];
+     if (res != 0) {
+	gpsd_report(LOG_PROG, "error %i\n", (int)res);
+	return 1;
+     }
+  }
+
+
+  return 0;
 }
 
 int cmd_program_word(int pfd, unsigned addr, uint16_t word)
@@ -413,7 +591,239 @@ int cmd_program_word(int pfd, unsigned addr, uint16_t word)
 
 int cmd_program_flash(int pfd, const char *prom_fname)
 {
-   return 0;
+  int res;
+  int prom_fd;
+  uint8_t *flash_sector, *file_sector;
+  struct flash_erase_block_t *eblock;
+  unsigned eblock_num, eblock_addr;
+  unsigned sector_size, max_sector_size;
+  off_t prom_file_size;
+  ssize_t read_size;
+  struct mdproto_cmd_flash_info_t flash_info;
+  struct flash_erase_block_t sector_map[FLASH_MAX_ERASE_BLOCK_NUM];
+
+  res = -1;
+  flash_sector = file_sector = NULL;
+  prom_fd = open(prom_fname, O_RDONLY);
+  if (prom_fd < 0) {
+     perror(NULL);
+     return res;
+  }
+
+  prom_file_size=lseek(prom_fd, SEEK_END, 0);
+  if (prom_file_size == -1) {
+     perror("Can't determine firmware file size");
+     goto cmd_program_flash_exit;
+  }
+
+  if (lseek(prom_fd, SEEK_SET, 0) < 0) {
+     perror("lseek() error");
+     goto cmd_program_flash_exit;
+  }
+
+  if (get_flash_info(pfd, &flash_info) != 0)
+     goto cmd_program_flash_exit;
+
+  if (flash_get_eblock_map(&flash_info, sector_map) < 0) {
+     gpsd_report(LOG_PROG, "No sector map\n");
+     goto cmd_program_flash_exit;
+  }
+  if ((sector_map[0].blocks) == 0 || (sector_map[0].bytes == 0)) {
+     gpsd_report(LOG_PROG, "Wrong sector map\n");
+     goto cmd_program_flash_exit;
+  }
+
+  if (flash_size_from_emap(sector_map) < prom_file_size) {
+     gpsd_report(LOG_PROG, "firmware size larger (%lu) than flash size (%lu)\n",
+	   (unsigned long)prom_file_size,
+	   (unsigned long)flash_size_from_emap(sector_map)
+	   );
+     goto cmd_program_flash_exit;
+  }
+
+  max_sector_size = flash_max_eblock_size(sector_map);
+  assert(max_sector_size > 0);
+
+  flash_sector = (uint8_t *)malloc(max_sector_size);
+  file_sector = (uint8_t *)malloc(max_sector_size);
+
+  if ((flash_sector == NULL) || (file_sector == NULL))
+     goto cmd_program_flash_exit;
+
+  eblock = &sector_map[0];
+  eblock_num=0;
+  eblock_addr=0;
+  while(1) {
+     sector_size = eblock->bytes;
+     assert(sector_size <= max_sector_size);
+
+     /* Read sector from firmware file  */
+     read_size = read(prom_fd, file_sector, sector_size);
+     if (read_size < 0) {
+	perror(NULL);
+	goto cmd_program_flash_exit;
+     }else if (read_size == 0)
+	break;
+
+     gpsd_report(LOG_PROG, "0x%-08x: sector_size: %u bytes\n", eblock_addr, sector_size);
+
+     /* Read sector from flash  */
+     if (dump_mem(pfd, EXT_SRAM_CSN0+eblock_addr, sector_size, flash_sector) != 0) {
+	gpsd_report(LOG_PROG, "Can't dump flash. Address: %u size: %u\n", eblock_addr, sector_size);
+	goto cmd_program_flash_exit;
+     }
+
+     if ((unsigned)read_size < sector_size)
+	memcpy(&file_sector[read_size], &flash_sector[read_size], sector_size-read_size);
+
+     if (memcmp(file_sector, flash_sector, read_size) == 0) {
+	gpsd_report(LOG_PROG, "Match.\n");
+     }else {
+	gpsd_report(LOG_PROG, "Reprogramming sector...\n");
+	if (program_sector(pfd, eblock_addr, file_sector, sector_size) != 0)
+	   goto cmd_program_flash_exit;
+     }
+
+     if ((unsigned)read_size < sector_size)
+	break;
+
+     /* next sector  */
+     eblock_addr += sector_size;
+     eblock_num += 1;
+     if (eblock_num == eblock->blocks) {
+	eblock_num=0;
+	eblock++;
+	if (eblock->blocks == 0)
+	   break;
+     }
+  }
+
+
+  res = 0;
+
+cmd_program_flash_exit:
+  free(flash_sector);
+  free(file_sector);
+  close(prom_fd);
+  return res;
 }
+
+static int flash_get_eblock_map(struct mdproto_cmd_flash_info_t *flash_info,
+      struct flash_erase_block_t *res)
+{
+   unsigned i;
+   unsigned flash_size, cur_size;
+   unsigned cur_row;
+   unsigned max_erase_block;
+   unsigned block_val;
+
+   assert(flash_info);
+   assert(res);
+
+   for (i=0; i<sizeof(FLASH_LIST)/sizeof(FLASH_LIST[0]); i++) {
+      if ( (FLASH_LIST[i].manuf_id == htons(flash_info->manuf_id))
+	    && (FLASH_LIST[i].device_id == htons(flash_info->device_id))) {
+	 memcpy(res, FLASH_LIST[i].map, sizeof(FLASH_LIST[i].map));
+	 return 0;
+      }
+   }
+
+   if ( (flash_info->cfi_id_string.q != 'Q')
+	 || (flash_info->cfi_id_string.r != 'R')
+	 || (flash_info->cfi_id_string.y != 'Y')) {
+      return -1;
+   }
+
+   cur_size=0;
+
+   /* XXX  */
+   if (flash_info->flash_geometry.size >= 32)
+      return -1;
+
+   /* Read flash geometry  */
+   flash_size = 1 << flash_info->flash_geometry.size;
+   cur_row=0;
+   max_erase_block = flash_info->flash_geometry.num_erase_blocks;
+   if (max_erase_block > sizeof(flash_info->flash_geometry.erase_blocks)/sizeof(flash_info->flash_geometry.erase_blocks[0]))
+      max_erase_block = sizeof(flash_info->flash_geometry.erase_blocks)/sizeof(flash_info->flash_geometry.erase_blocks[0]);
+   if (max_erase_block > FLASH_MAX_ERASE_BLOCK_NUM)
+      max_erase_block = FLASH_MAX_ERASE_BLOCK_NUM;
+
+   for(i=0; i<max_erase_block; ++i) {
+      block_val = htonl(flash_info->flash_geometry.erase_blocks[i]);
+      res[cur_row].blocks = (block_val & 0xffff)+1;
+      res[cur_row].bytes = 256*((block_val >> 16) & 0xffff);
+      if (res[cur_row].bytes == 0)
+	 res[cur_row].bytes = 128;
+      cur_size +=  res[cur_row].blocks * res[cur_row].bytes;
+      ++cur_row;
+      if (cur_size == flash_size) {
+	 res[cur_row].bytes = res[cur_row].blocks = 0;
+	 return 0;
+      }else if (cur_size > flash_size)
+	 break;
+   }
+
+   gpsd_report(LOG_PROG, "flash_get_eblock_map: incorrect sector map. "
+	 "Current summary sector size: %u. Flash size: %u\n", cur_size, flash_size);
+
+   return -1;
+}
+
+static unsigned flash_max_eblock_size(struct flash_erase_block_t *map)
+{
+   unsigned max_size;
+
+   max_size=0;
+   for(; map->blocks != 0; ++map) {
+      if (map->bytes > max_size)
+	 max_size = map->bytes;
+   }
+
+   return max_size;
+}
+
+static unsigned flash_size_from_emap(struct flash_erase_block_t *map)
+{
+   unsigned size;
+
+   size=0;
+   for(; map->blocks != 0; map++)
+      size += map->blocks * map->bytes;
+
+   return size;
+}
+
+static struct flash_erase_block_t *flash_eblock_by_idx(struct flash_erase_block_t *map, unsigned i)
+{
+   unsigned nextb_first_idx;
+
+   nextb_first_idx=0;
+   while (map->blocks != 0) {
+      nextb_first_idx += map->blocks;
+      if (nextb_first_idx > i)
+	 break;
+      ++map;
+   }
+
+   return map;
+}
+
+static struct flash_erase_block_t *flash_eblock_by_addr(struct flash_erase_block_t *map, unsigned addr)
+{
+   unsigned nextb_first_addr;
+
+   nextb_first_addr=0;
+   while (map->blocks != 0) {
+      nextb_first_addr += map->bytes * map->blocks;
+      if (nextb_first_addr > addr)
+	 break;
+      ++map;
+   }
+
+   return map;
+}
+
+
 
 
