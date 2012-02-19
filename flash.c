@@ -482,7 +482,7 @@ static int program_sector(int pfd, unsigned addr, uint8_t *data, unsigned data_s
      if (data_size >= sizeof(t_req.payload)) {
 	chunk_size = sizeof(t_req.payload);
 	memcpy(t_req.payload, data, chunk_size);
-	gpsd_report(LOG_PROG, "programming %-08x: %u bytes\n", addr, chunk_size);
+	gpsd_report(LOG_PROG, "programming 0x%08x: %u bytes\n", addr, chunk_size);
 
 	write_size = mdproto_pkt_init(&cmd, MDPROTO_CMD_FLASH_PROGRAM,
 	      &t_req, sizeof(t_req));
@@ -492,7 +492,7 @@ static int program_sector(int pfd, unsigned addr, uint8_t *data, unsigned data_s
      }else {
 	chunk_size = data_size;
 	memcpy(t_req.payload, data, chunk_size);
-	gpsd_report(LOG_PROG, "programming %-08x: %u bytes\n", addr, chunk_size);
+	gpsd_report(LOG_PROG, "programming 0x%08x: %u bytes\n", addr, chunk_size);
 
 	addr += chunk_size;
 	data_size = 0;
@@ -665,7 +665,7 @@ int cmd_program_flash(int pfd, const char *prom_fname)
      }else if (read_size == 0)
 	break;
 
-     gpsd_report(LOG_PROG, "0x%-08x: sector_size: %u bytes\n", eblock_addr, sector_size);
+     gpsd_report(LOG_PROG, "0x%08x: sector_size: %u bytes\n", eblock_addr, sector_size);
 
      /* Read sector from flash  */
      if (dump_mem(pfd, EXT_SRAM_CSN0+eblock_addr, sector_size, flash_sector) != 0) {
