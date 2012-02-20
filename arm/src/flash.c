@@ -77,6 +77,10 @@ int flash_init()
 	    && ((flash[0x11] & 0xff) == 'R')
 	    && ((flash[0x12] & 0xff) == 'Y')) {
 	 /* CFI device */
+	 /* XXX: SST39VF400A workaroud - needs 16b_unprotect for flashing */
+	 flash_16b_jedec_id_query();
+	 if (flash[0] == 0xbf)
+	    flash_sdp_unprotect = &flash_sdp_16b_unprotect;
 	 goto flash_16bit_done;
       }
 
