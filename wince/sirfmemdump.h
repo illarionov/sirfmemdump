@@ -28,6 +28,9 @@
 INT_PTR CALLBACK select_com_port_callback(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 INT_PTR CALLBACK dump_mem_callback(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 INT_PTR CALLBACK change_gps_mode_callback(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+INT_PTR CALLBACK program_word_callback(HWND dialog, UINT message, WPARAM wParam, LPARAM lParam);
+INT_PTR CALLBACK erase_sector_callback(HWND dialog, UINT message, WPARAM wParam, LPARAM lParam);
+INT_PTR CALLBACK program_flash_callback(HWND dialog, UINT message, WPARAM wParam, LPARAM lParam);
 int refresh_status_wnd(struct serial_session_t *s, HWND status_wnd);
 
 

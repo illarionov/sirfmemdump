@@ -216,6 +216,33 @@ INT_PTR CALLBACK WndProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 					msg_handled = TRUE;
 					break;
 
+				case IDM_PROGRAM_WORD:
+					DialogBoxParam(g_hInst,
+						(LPCTSTR)IDD_PROGRAM_WORD,
+						hDlg,
+						program_word_callback,
+						(LPARAM)&current_session
+						);
+					msg_handled = TRUE;
+					break;
+				case IDM_ERASE_SECTOR:
+					DialogBoxParam(g_hInst,
+						(LPCTSTR)IDD_ERASE_SECTOR,
+						hDlg,
+						erase_sector_callback,
+						(LPARAM)&current_session
+						);
+					msg_handled = TRUE;
+					break;
+				case IDM_PROGRAM_FLASH:
+					DialogBoxParam(g_hInst,
+						(LPCTSTR)IDD_PROGRAM_FLASH,
+						hDlg,
+						program_flash_callback,
+						(LPARAM)&current_session
+						);
+					msg_handled = TRUE;
+					break;
 				case IDM_GET_FLASH_INFO:
 					serial_session_req_flash_info(current_session);
 					msg_handled = TRUE;

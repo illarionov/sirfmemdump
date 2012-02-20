@@ -401,11 +401,23 @@
 				>
 			</File>
 			<File
+				RelativePath=".\erase_sector_ui.c"
+				>
+			</File>
+			<File
 				RelativePath=".\flash.c"
 				>
 			</File>
 			<File
 				RelativePath=".\logger.c"
+				>
+			</File>
+			<File
+				RelativePath=".\program_flash_ui.c"
+				>
+			</File>
+			<File
+				RelativePath=".\program_word_ui.c"
 				>
 			</File>
 			<File
