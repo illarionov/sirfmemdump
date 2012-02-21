@@ -412,7 +412,19 @@ int refresh_status_wnd(struct serial_session_t *s, HWND status_wnd)
 static int refresh_mainmenu()
 {
 	HMENU menu;
+	const unsigned enabled_items[] = {
+		IDM_LOADDUMPER,
+		IDM_PING,
+		IDM_GET_FLASH_INFO,
+		IDM_CHANGE_GPS_MODE,
+		IDM_DUMP_MEM,
+		IDM_PROGRAM_WORD,
+		IDM_ERASE_SECTOR,
+		IDM_PROGRAM_FLASH,
+		0
+	};
 	unsigned enabled;
+	const unsigned *i;
 
 	if (current_session != NULL)
 		enabled = 0;
@@ -429,12 +441,8 @@ static int refresh_mainmenu()
 		return -1;
 	}
 
-	EnableMenuItem(menu,  IDM_LOADDUMPER, MF_BYCOMMAND | enabled);
-
-	EnableMenuItem(menu,  IDM_PING, MF_BYCOMMAND | enabled);
-	EnableMenuItem(menu,  IDM_GET_FLASH_INFO, MF_BYCOMMAND | enabled);
-	EnableMenuItem(menu,  IDM_CHANGE_GPS_MODE, MF_BYCOMMAND | enabled);
-	EnableMenuItem(menu,  IDM_DUMP_MEM, MF_BYCOMMAND | enabled);
+	for(i=enabled_items; *i != 0; i++)
+		EnableMenuItem(menu,  *i, MF_BYCOMMAND | enabled);
 
 	return 0;
 }

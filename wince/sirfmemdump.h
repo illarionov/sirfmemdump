@@ -25,6 +25,11 @@
 
 #define REFRESH_STATUS_WND_PERIOD 1000
 
+#define FLASH_MAX_ERASE_BLOCK_NUM 10
+/* XXX */
+#define EXT_SRAM_CSN0 0x40000000
+
+
 INT_PTR CALLBACK select_com_port_callback(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 INT_PTR CALLBACK dump_mem_callback(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 INT_PTR CALLBACK change_gps_mode_callback(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
@@ -72,7 +77,10 @@ struct serial_session_t {
 		REQUEST_NONE,
 		REQUEST_DUMP,
 		REQUEST_GPS_MODE,
-		REQUEST_FLASH_INFO
+		REQUEST_FLASH_INFO,
+		REQUEST_ERASE_SECTOR,
+		REQUEST_PROGRAM_WORD,
+		REQUEST_PROGRAM_FLASH
 	} request;
 	
 	union {
@@ -93,7 +101,23 @@ struct serial_session_t {
 			unsigned from_gps_mode;
 			unsigned to_gps_mode;
 		} gps_mode;
+		struct {
+			unsigned addr;
+		} erase_sector;
+		struct {
+			unsigned addr;
+			unsigned word;
+		} program_word;
+		struct {
+			TCHAR firmare_fname[MAX_PATH];
+		} program_flash;
 	} req_ctx;
+};
+
+
+struct flash_erase_block_t {
+   unsigned blocks;
+   unsigned bytes;
 };
 
 
@@ -125,6 +149,9 @@ int serial_session_req_change_gps_mode(struct serial_session_t *s,
 									   unsigned from_mode,
 									   unsigned to_mode);
 int serial_session_req_flash_info(struct serial_session_t *s);
+int serial_session_req_program_word(struct serial_session_t *s, unsigned addr, unsigned word);
+int serial_session_req_erase_sector(struct serial_session_t *s, unsigned addr);
+int serial_session_req_program_flash(struct serial_session_t *s, const TCHAR *fname);
 
 /* Serial thread commands */
 int nmea_set_serial_state(struct serial_session_t *s,
@@ -143,9 +170,19 @@ int internal_boot_send_loader(struct serial_session_t *s);
 int memdump_cmd_ping(struct serial_session_t *s);
 int memdump_cmd_dump(struct serial_session_t *s);
 int memdump_cmd_get_flash_info(struct serial_session_t *s);
+int memdump_cmd_erase_sector(struct serial_session_t *s);
+int memdump_cmd_program_word(struct serial_session_t *s);
+int memdump_cmd_program_flash(struct serial_session_t *s);
 
 int sirf_is_msg(const BYTE *buf, size_t buf_size);
 int nmea_is_msg(const BYTE *buf, size_t buf_size);
+
+/* flash.c */
+int flash_get_eblock_map(struct mdproto_cmd_flash_info_t *flash_info,
+      struct flash_erase_block_t *res);
+unsigned flash_size_from_emap(struct flash_erase_block_t *map);
+unsigned flash_max_eblock_size(struct flash_erase_block_t *map);
+int dump_flash_info(const struct mdproto_cmd_flash_info_t *data);
 
 /* Logger */
 #define LOG_DEBUG 100

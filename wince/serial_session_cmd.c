@@ -55,6 +55,13 @@ static int read_mdproto_pkt(struct serial_session_t *s, struct mdproto_cmd_buf_t
 
 static int close_dump_request(struct serial_session_t *s);
 
+static int get_flash_info(struct serial_session_t *s, struct mdproto_cmd_flash_info_t *res);
+static int dump_mem(struct serial_session_t *s, unsigned src_addr, unsigned size, uint8_t *dst);
+static int erase_sector(struct serial_session_t *s, unsigned addr);
+static int program_sector(struct serial_session_t *s,
+						  unsigned addr,
+						  uint8_t *data,
+						  unsigned data_size);
 
 /* Nmea */
 static int nmea_snprintf(BYTE *dst, size_t dst_size, const TCHAR *fmt, ...)
@@ -1117,14 +1124,11 @@ int memdump_cmd_ping(struct serial_session_t *s)
 	return 0;
 }
 
-int memdump_cmd_dump(struct serial_session_t *s)
+static int dump_mem(struct serial_session_t *s, unsigned src_addr, unsigned size, uint8_t *dst)
 {
-	unsigned addr_from, addr_to;
+	unsigned dst_addr;
 	int write_size;
 	int cur_size;
-	int lock_res;
-	int res;
-	BYTE *dst;
 	struct mdproto_cmd_buf_t cmd;
 
 #pragma pack(push, 1)
@@ -1134,26 +1138,9 @@ int memdump_cmd_dump(struct serial_session_t *s)
 	} req;
 #pragma pack(pop)
 
-	logger_debug(TEXT("memdump_cmd_dump()..."));
-
-	if (lock_res = serial_session_mtx_lock(s, INFINITE) < 0)
-		return lock_res;
-
-	assert(s->request == REQUEST_DUMP);
-	assert(s->req_ctx.dump.f_view);
-
-	if (s->req_ctx.dump.use_mid131) {
-		int res;
-		res = sirf_mid131_dump(s);
-		serial_session_mtx_unlock(s);
-		return res;
-	}
-
-	dst = s->req_ctx.dump.f_view;
-	addr_from = s->req_ctx.dump.addr_from;
-	addr_to = s->req_ctx.dump.addr_to;
-	req.src = htonl(addr_from);
-	req.dst = htonl(addr_to);
+	dst_addr = src_addr+size-1;
+	req.src = htonl(src_addr);
+	req.dst = htonl(dst_addr);
 	write_size = mdproto_pkt_init(&cmd, MDPROTO_CMD_MEM_READ, &req, sizeof(req));
 
 	if (serial_session_is_open(s))
@@ -1161,16 +1148,16 @@ int memdump_cmd_dump(struct serial_session_t *s)
 			PURGE_TXABORT | PURGE_RXABORT | PURGE_TXCLEAR | PURGE_RXCLEAR);
 
 	if (switch_gps_mode(s, s->req_ctx.dump.gps_mode, PROTO_MEMDUMP) < 0)
-		goto dump_cmd_end;
+		return -1;
 
 	if (serial_session_write(s, &cmd, write_size) < 0)
-		goto dump_cmd_end;
+		return -1;
 
 	serial_session_set_error(s, 0, NULL);
-	while (addr_from <= addr_to) {
+	while (src_addr <= dst_addr) {
 		int read_res;
 
-		logger_info(TEXT("0x%x..."), addr_from);
+		logger_info(TEXT("0x%x..."), src_addr);
 		read_res = read_mdproto_pkt(s, &cmd);
 
 		if (read_res < 0
@@ -1190,10 +1177,35 @@ int memdump_cmd_dump(struct serial_session_t *s)
 		if (cur_size > 0)
 			memcpy(dst, &cmd.data.p[1], cur_size);
 		dst += cur_size;
-		addr_from += cur_size;
+		src_addr += cur_size;
+	}
+	return 0;
+}
+
+int memdump_cmd_dump(struct serial_session_t *s)
+{
+	int lock_res;
+	int res;
+
+	logger_debug(TEXT("memdump_cmd_dump()..."));
+
+	if (lock_res = serial_session_mtx_lock(s, INFINITE) < 0)
+		return lock_res;
+
+	assert(s->request == REQUEST_DUMP);
+	assert(s->req_ctx.dump.f_view);
+
+	if (s->req_ctx.dump.use_mid131) {
+		int res;
+		res = sirf_mid131_dump(s);
+		serial_session_mtx_unlock(s);
+		return res;
 	}
 
-dump_cmd_end:
+	dump_mem(s, s->req_ctx.dump.addr_from, 
+		s->req_ctx.dump.addr_to - s->req_ctx.dump.addr_from + 1,
+		s->req_ctx.dump.f_view);
+
 	res = close_dump_request(s);
 	serial_session_mtx_unlock(s);
 	return res;
@@ -1264,22 +1276,14 @@ static int close_dump_request(struct serial_session_t *s)
 	return -1;
 }
 
-int memdump_cmd_get_flash_info(struct serial_session_t *s)
+static int get_flash_info(struct serial_session_t *s, struct mdproto_cmd_flash_info_t *res)
 {
 	int msg_size;
-	int lock_res;
 	struct mdproto_cmd_buf_t cmd;
 
-	assert(s);
-
-	logger_debug(TEXT("Memdump: get flash info"));
-
+	assert(res);
 	msg_size = mdproto_pkt_init(&cmd, MDPROTO_CMD_FLASH_INFO, NULL, 0);
-
 	assert(msg_size > 0);
-
-	if (lock_res = serial_session_mtx_lock(s, INFINITE) < 0)
-		return lock_res;
 
 	if (serial_session_is_open(s))
 		PurgeComm(s->port_handle,
@@ -1289,7 +1293,6 @@ int memdump_cmd_get_flash_info(struct serial_session_t *s)
 		serial_session_mtx_unlock(s);
 		return -1;
 	}
-
 	if (serial_session_write(s, &cmd, msg_size) < 0) {
 		serial_session_mtx_unlock(s);
 		return -1;
@@ -1315,11 +1318,410 @@ int memdump_cmd_get_flash_info(struct serial_session_t *s)
 	   serial_session_mtx_unlock(s);
        return -1;
     }
-	dump_flash_info((struct mdproto_cmd_flash_info_t *)&cmd.data.p[1]);
+
+	memcpy(res, &cmd.data.p[1], sizeof(*res));
+	return 0;
+}
+
+int memdump_cmd_get_flash_info(struct serial_session_t *s)
+{
+	int lock_res;
+	struct mdproto_cmd_flash_info_t flash_info;
+
+	assert(s);
+
+	logger_debug(TEXT("Memdump: get flash info"));
+
+	if (lock_res = serial_session_mtx_lock(s, INFINITE) < 0)
+		return lock_res;
+
+	if (get_flash_info(s, &flash_info) != 0) {
+		serial_session_mtx_unlock(s);
+		return 1;
+	}
+	
+	dump_flash_info(&flash_info);
 	
 	serial_session_set_error(s, 0, NULL);
 	serial_session_mtx_unlock(s);
 	return 0;
+}
+
+int memdump_cmd_program_word(struct serial_session_t *s)
+{
+	int msg_size;
+	int lock_res;
+	struct mdproto_cmd_buf_t cmd;
+
+#pragma pack(push, 1)
+	struct {
+	   uint32_t addr;
+	   uint16_t payload;
+    } t_req;
+#pragma pack(pop)
+
+	assert(s);
+
+	if (lock_res = serial_session_mtx_lock(s, INFINITE) < 0)
+		return lock_res;
+
+	logger_debug(TEXT("Memdump: program-word 0x%08x: 0x%04x"),
+		s->req_ctx.program_word.addr,
+		s->req_ctx.program_word.word
+		);
+
+	msg_size = mdproto_pkt_init(&cmd, MDPROTO_CMD_FLASH_PROGRAM, &t_req, 
+		sizeof(t_req));
+	assert(msg_size > 0);
+
+	if (serial_session_is_open(s))
+		PurgeComm(s->port_handle,
+			PURGE_TXABORT | PURGE_RXABORT | PURGE_TXCLEAR | PURGE_RXCLEAR);
+
+	if (switch_gps_mode(s, s->proto, PROTO_MEMDUMP) < 0) {
+		serial_session_mtx_unlock(s);
+		return -1;
+	}
+
+	if (serial_session_write(s, &cmd, msg_size) < 0) {
+		serial_session_mtx_unlock(s);
+		return -1;
+	}
+
+	if (read_mdproto_pkt(s, &cmd) < 0) {
+		serial_session_mtx_unlock(s);
+		return -1;
+	}
+
+    if (cmd.data.id != MDPROTO_CMD_FLASH_PROGRAM_RESPONSE) {
+		logger_error(TEXT("received wrong response code `0x%x`"), cmd.data.id);
+		serial_session_set_error(s, 0, TEXT("received wrong response code"));
+		serial_session_mtx_unlock(s);
+		return -1;
+	}
+
+    if (ntohs(cmd.size) != 1+1) {
+		logger_error(TEXT("received wrong response size `0x%u` != `0x%u`"), (unsigned)ntohs(cmd.size),
+			1+1
+			);
+	   serial_session_set_error(s, 0, TEXT("received wrong response size"));
+	   serial_session_mtx_unlock(s);
+       return -1;
+    }
+
+	if (cmd.data.p[1] == 0) {
+		serial_session_set_error(s, 0, NULL);
+		logger_info(TEXT("OK"));
+	} else {
+		logger_error(TEXT("program-word error %i"), (int)cmd.data.p[1]);
+		serial_session_set_error(s, 0, TEXT("program word error"));
+	}
+
+	serial_session_mtx_unlock(s);
+	return 0;
+}
+
+static int erase_sector(struct serial_session_t *s, unsigned addr)
+{
+	int msg_size;
+	struct mdproto_cmd_buf_t cmd;
+    uint32_t addr_uint32;
+
+	addr_uint32 = (uint32_t)addr;
+
+	msg_size = mdproto_pkt_init(&cmd, MDPROTO_CMD_FLASH_PROGRAM, &addr_uint32, 
+		sizeof(addr));
+	assert(msg_size > 0);
+
+	PurgeComm(s->port_handle,
+			PURGE_TXABORT | PURGE_RXABORT | PURGE_TXCLEAR | PURGE_RXCLEAR);
+
+	if (switch_gps_mode(s, s->proto, PROTO_MEMDUMP) < 0)
+		return -1;
+
+	if (serial_session_write(s, &cmd, msg_size) < 0)
+		return -1;
+
+	if (read_mdproto_pkt(s, &cmd) < 0)
+		return -1;
+
+    if (cmd.data.id != MDPROTO_CMD_FLASH_ERASE_SECTOR_RESPONSE) {
+		logger_error(TEXT("received wrong response code `0x%x`"), cmd.data.id);
+		serial_session_set_error(s, 0, TEXT("received wrong response code"));
+		return -1;
+	}
+
+    if (ntohs(cmd.size) != 1+1) {
+		logger_error(TEXT("received wrong response size `0x%u` != `0x%u`"), (unsigned)ntohs(cmd.size),
+			1+1
+			);
+	   serial_session_set_error(s, 0, TEXT("received wrong response size"));
+       return -1;
+    }
+
+	if (cmd.data.p[1] == 0) {
+		serial_session_set_error(s, 0, NULL);
+		logger_info(TEXT("OK"));
+	} else {
+		logger_error(TEXT("erase-sector error %i"), (int)cmd.data.p[1]);
+		serial_session_set_error(s, 0, TEXT("erase-sector error"));
+		return -1;
+	}
+
+	return 0;
+}
+
+int memdump_cmd_erase_sector(struct serial_session_t *s)
+{
+	int lock_res;
+	   
+	assert(s);
+
+	if (lock_res = serial_session_mtx_lock(s, INFINITE) < 0)
+		return lock_res;
+
+	logger_debug(TEXT("Memdump: erase-sector %08x"),
+		s->req_ctx.erase_sector.addr);
+
+	if (erase_sector(s, s->req_ctx.erase_sector.addr) != 0)
+		return -1;
+
+	serial_session_mtx_unlock(s);
+	return 0;
+}
+
+static int program_sector(struct serial_session_t *s,
+						  unsigned addr,
+						  uint8_t *data,
+						  unsigned data_size)
+{
+	int res;
+	int write_size;
+	unsigned chunk_size;
+	struct mdproto_cmd_buf_t cmd;
+#pragma pack(push, 1)
+	struct {
+		uint32_t addr;
+		uint8_t payload[MDPROTO_CMD_MAX_RAW_DATA_SIZE-4];
+	} t_req;
+#pragma pack(pop)
+	
+	assert((sizeof(t_req.payload) % 4) == 0);
+	assert(sizeof(t_req.payload) >= 4);
+
+	res = erase_sector(s, addr);
+	if (res != 0)
+		return res;
+
+	while (data_size != 0) {
+
+		t_req.addr = ntohl((uint32_t)addr);
+
+		if (data_size >= sizeof(t_req.payload)) {
+			chunk_size = sizeof(t_req.payload);
+			memcpy(t_req.payload, data, chunk_size);
+			logger_info(TEXT("programming 0x%08x: %u bytes"), addr, chunk_size);
+
+			write_size = mdproto_pkt_init(&cmd, MDPROTO_CMD_FLASH_PROGRAM,
+				&t_req, sizeof(t_req));
+			data_size -= chunk_size;
+			addr += chunk_size;
+			data += chunk_size;
+		}else {
+			chunk_size = data_size;
+			memcpy(t_req.payload, data, chunk_size);
+			logger_info(TEXT("programming 0x%08x: %u bytes"), addr, chunk_size);
+			addr += chunk_size;
+			data_size = 0;
+
+			if (chunk_size % 2)
+				t_req.payload[chunk_size++] = 0xff;
+			write_size = mdproto_pkt_init(&cmd, MDPROTO_CMD_FLASH_PROGRAM,
+				&t_req, chunk_size+4);
+		}
+
+		PurgeComm(s->port_handle,
+			PURGE_TXABORT | PURGE_RXABORT | PURGE_TXCLEAR | PURGE_RXCLEAR);
+
+		if (serial_session_write(s, &cmd, write_size) < 0)
+			return -1;
+
+		if (read_mdproto_pkt(s, &cmd) < 0)
+			return -1;
+
+		if (cmd.data.id != MDPROTO_CMD_FLASH_PROGRAM_RESPONSE) {
+			logger_error(TEXT("received wrong response code `0x%x`"), cmd.data.id);
+			serial_session_set_error(s, 0, TEXT("received wrong response code"));
+			return -1;
+		}
+
+		if (ntohs(cmd.size) != 1+1) {
+			logger_error(TEXT("received wrong response size `0x%u` != `0x%u`"), (unsigned)ntohs(cmd.size),
+				1+1);
+			serial_session_set_error(s, 0, TEXT("received wrong response size"));
+			return -1;
+		}
+
+		if (cmd.data.p[1] == 0) {
+			serial_session_set_error(s, 0, NULL);
+			logger_info(TEXT("OK"));
+		} else {
+			logger_error(TEXT("erase-sector error %i"), (int)cmd.data.p[1]);
+			serial_session_set_error(s, 0, TEXT("erase-sector error"));
+		}
+
+		res = (int8_t)cmd.data.p[1];
+		if (res != 0) {
+			logger_error(TEXT("program-flash error %i"), res);
+			serial_session_set_error(s, 0, TEXT("program-flash error"));
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
+
+
+int memdump_cmd_program_flash(struct serial_session_t *s)
+{
+	int lock_res;
+	int res;
+	HANDLE prom_fd;
+	uint8_t *flash_sector, *file_sector;
+	struct flash_erase_block_t *eblock;
+	unsigned eblock_num, eblock_addr;
+	unsigned sector_size, max_sector_size;
+	unsigned prom_file_size;
+	unsigned read_size;
+	struct mdproto_cmd_flash_info_t flash_info;
+	struct flash_erase_block_t sector_map[FLASH_MAX_ERASE_BLOCK_NUM];
+
+	assert(s);
+
+	if (lock_res = serial_session_mtx_lock(s, INFINITE) < 0)
+		return lock_res;
+
+	logger_debug(TEXT("Memdump: program-flash %s"),
+		s->req_ctx.program_flash.firmare_fname
+		);
+
+	if (serial_session_is_open(s))
+		PurgeComm(s->port_handle,
+		PURGE_TXABORT | PURGE_RXABORT | PURGE_TXCLEAR | PURGE_RXCLEAR);
+
+	if (switch_gps_mode(s, s->proto, PROTO_MEMDUMP) < 0) {
+		serial_session_mtx_unlock(s);
+		return -1;
+	}
+
+	res = -1;
+	flash_sector = file_sector = NULL;
+	prom_fd = CreateFile(s->req_ctx.program_flash.firmare_fname, GENERIC_READ,
+		0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (prom_fd == INVALID_HANDLE_VALUE) {
+		serial_session_set_perror(s, TEXT("Firmware file error"));
+		serial_session_mtx_unlock(s);
+		return -1;
+	}
+
+	prom_file_size=GetFileSize(prom_fd, NULL);
+	/* XXX */
+	if (prom_file_size == 0xFFFFFFFF) {
+		serial_session_set_perror(s, TEXT("Can't determine firmware file size"));
+		goto cmd_program_flash_exit;
+	}
+
+	if (get_flash_info(s, &flash_info) != 0)
+		goto cmd_program_flash_exit;
+
+	if (flash_get_eblock_map(&flash_info, sector_map) < 0) {
+		logger_error(TEXT("No sector map"));
+		serial_session_set_error(s, 0, TEXT("No sector map"));
+		goto cmd_program_flash_exit;
+	}
+	if ((sector_map[0].blocks) == 0 || (sector_map[0].bytes == 0)) {
+		logger_error(TEXT("Wrong sector map"));
+		serial_session_set_error(s, 0, TEXT("Wrong sector map"));
+		goto cmd_program_flash_exit;
+	}
+
+	if (flash_size_from_emap(sector_map) < prom_file_size) {
+		logger_error(TEXT("firmware size larger (%lu) than flash size (%lu)\n"),
+			(unsigned long)prom_file_size,
+			(unsigned long)flash_size_from_emap(sector_map)
+			);
+		goto cmd_program_flash_exit;
+	}
+
+	max_sector_size = flash_max_eblock_size(sector_map);
+	assert(max_sector_size > 0);
+
+	flash_sector = (uint8_t *)malloc(max_sector_size);
+	file_sector = (uint8_t *)malloc(max_sector_size);
+
+	if ((flash_sector == NULL) || (file_sector == NULL))
+		goto cmd_program_flash_exit;
+
+	eblock = &sector_map[0];
+	eblock_num=0;
+	eblock_addr=0;
+	while(1) {
+		sector_size = eblock->bytes;
+		assert(sector_size <= max_sector_size);
+
+		/* Read sector from firmware file  */
+		if (!ReadFile(prom_fd, file_sector, sector_size, &read_size, NULL)) {
+			if (read_size == 0)
+				break;
+			serial_session_set_perror(s, TEXT("ReadFile() error"));
+			goto cmd_program_flash_exit;
+		}else if (read_size == 0)
+			break;
+
+		logger_info(TEXT("0x%08x: sector_size: %u bytes\n"), eblock_addr, sector_size);
+
+		/* Read sector from flash  */
+		if (dump_mem(s, EXT_SRAM_CSN0+eblock_addr, sector_size, flash_sector) != 0) {
+			assert(s->last_err_msg[0] != 0);
+			goto cmd_program_flash_exit;
+		}
+
+		if ((unsigned)read_size < sector_size)
+			memcpy(&file_sector[read_size], &flash_sector[read_size], sector_size-read_size);
+
+		if (memcmp(file_sector, flash_sector, read_size) == 0) {
+			logger_info(TEXT("Match"));
+		}else {
+			logger_info(TEXT("Reprogramming sector..."));
+			if (program_sector(s, eblock_addr, file_sector, sector_size) != 0)
+				assert(s->last_err_msg[0] != 0);
+				goto cmd_program_flash_exit;
+		}
+
+		if ((unsigned)read_size < sector_size)
+			break;
+
+		/* next sector  */
+		eblock_addr += sector_size;
+		eblock_num += 1;
+		if (eblock_num == eblock->blocks) {
+			eblock_num=0;
+			eblock++;
+			if (eblock->blocks == 0)
+				break;
+		}
+	}
+
+	res = 0;
+
+cmd_program_flash_exit:
+	free(flash_sector);
+	free(file_sector);
+	CloseHandle(prom_fd);
+  
+	serial_session_mtx_unlock(s);
+	return res;
 }
 
 

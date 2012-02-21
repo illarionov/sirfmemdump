@@ -19,10 +19,6 @@
 
 static int init_dialog_controls(HWND dialog, struct serial_session_t *s);
 
-static int init_dialog_controls(HWND dialog, struct serial_session_t *s)
-{
-	return 0;
-}
 
 INT_PTR CALLBACK program_flash_callback(HWND dialog, UINT message, WPARAM wParam, LPARAM lParam)
 {
@@ -56,7 +52,27 @@ INT_PTR CALLBACK program_flash_callback(HWND dialog, UINT message, WPARAM wParam
 			current_session = (struct serial_session_t **)GetWindowLong(dialog, DWL_USER);
 			assert(current_session);
 			switch (LOWORD(wParam))
-			{				
+			{
+				case IDC_SRC_FILE_PICKER:
+					{
+						OPENFILENAME ofn;
+						TCHAR fname[MAX_PATH] = TEXT("");
+
+						memset (&ofn, 0, sizeof (ofn));
+						ofn.lStructSize  = sizeof (OPENFILENAME);
+						ofn.hwndOwner = dialog;
+						ofn.lpstrFile = fname;
+						ofn.nMaxFile = MAX_PATH;
+						ofn.lpstrTitle = TEXT("Select firmware file");
+						ofn.Flags = OFN_HIDEREADONLY; 
+						GetDlgItemText(dialog, IDC_SRC_FILE, fname,
+							sizeof(fname)/sizeof(fname[0]));
+						if (GetOpenFileName(&ofn))
+							SetDlgItemText(dialog, IDC_SRC_FILE, fname);
+
+						msg_handled = TRUE;
+					}
+					break;
 				case IDOK:
 					close_dialog = TRUE;
 					msg_handled = TRUE;
@@ -78,4 +94,9 @@ INT_PTR CALLBACK program_flash_callback(HWND dialog, UINT message, WPARAM wParam
 	}
 
     return (INT_PTR)msg_handled;
+}
+
+static int init_dialog_controls(HWND dialog, struct serial_session_t *s)
+{
+	return 0;
 }

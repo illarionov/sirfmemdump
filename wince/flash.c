@@ -18,10 +18,26 @@
 #include "sirfmemdump.h"
 #include "mdproto.h"
 
+const struct {
+   unsigned manuf_id;
+   unsigned device_id;
+   TCHAR *manuf_name;
+   TCHAR *dev_name;
+   struct flash_erase_block_t map[FLASH_MAX_ERASE_BLOCK_NUM];
+} FLASH_LIST[] = {
+   {
+      /* Spansion S29AL004D bottom boot block  */
+      0x22b9, 0x22ba, TEXT("Spansion"), TEXT("AM29LV400BB"),
+      { {1, 16384}, {2, 8192}, {1, 32768}, {7, 65536}, {0, 0}  }
+   }
+};
 
+
+static struct flash_erase_block_t *flash_eblock_by_idx(struct flash_erase_block_t *map, unsigned i);
+static struct flash_erase_block_t *flash_eblock_by_addr(struct flash_erase_block_t *map, unsigned addr);
 static void flash_get_name(unsigned manufacturer_id, unsigned device_id,
       const TCHAR **manufacturer, const TCHAR **device);
-int dump_flash_info(const struct mdproto_cmd_flash_info_t *data);
+
 
 int dump_flash_info(const struct mdproto_cmd_flash_info_t *data)
 {
@@ -256,3 +272,118 @@ static void flash_get_name(unsigned manufacturer_id, unsigned device_id,
 
 }
 
+int flash_get_eblock_map(struct mdproto_cmd_flash_info_t *flash_info,
+      struct flash_erase_block_t *res)
+{
+   unsigned i;
+   unsigned flash_size, cur_size;
+   unsigned cur_row;
+   unsigned max_erase_block;
+   unsigned block_val;
+
+   assert(flash_info);
+   assert(res);
+
+   for (i=0; i<sizeof(FLASH_LIST)/sizeof(FLASH_LIST[0]); i++) {
+      if ( (FLASH_LIST[i].manuf_id == htons(flash_info->manuf_id))
+	    && (FLASH_LIST[i].device_id == htons(flash_info->device_id))) {
+	 memcpy(res, FLASH_LIST[i].map, sizeof(FLASH_LIST[i].map));
+	 return 0;
+      }
+   }
+
+   if ( (flash_info->cfi_id_string.q != 'Q')
+	 || (flash_info->cfi_id_string.r != 'R')
+	 || (flash_info->cfi_id_string.y != 'Y')) {
+      return -1;
+   }
+
+   cur_size=0;
+
+   /* XXX  */
+   if (flash_info->flash_geometry.size >= 32)
+      return -1;
+
+   /* Read flash geometry  */
+   flash_size = 1 << flash_info->flash_geometry.size;
+   cur_row=0;
+   max_erase_block = flash_info->flash_geometry.num_erase_blocks;
+   if (max_erase_block > sizeof(flash_info->flash_geometry.erase_blocks)/sizeof(flash_info->flash_geometry.erase_blocks[0]))
+      max_erase_block = sizeof(flash_info->flash_geometry.erase_blocks)/sizeof(flash_info->flash_geometry.erase_blocks[0]);
+   if (max_erase_block > FLASH_MAX_ERASE_BLOCK_NUM)
+      max_erase_block = FLASH_MAX_ERASE_BLOCK_NUM;
+
+   for(i=0; i<max_erase_block; ++i) {
+      block_val = htonl(flash_info->flash_geometry.erase_blocks[i]);
+      res[cur_row].blocks = (block_val & 0xffff)+1;
+      res[cur_row].bytes = 256*((block_val >> 16) & 0xffff);
+      if (res[cur_row].bytes == 0)
+	 res[cur_row].bytes = 128;
+      cur_size +=  res[cur_row].blocks * res[cur_row].bytes;
+      ++cur_row;
+      if (cur_size == flash_size) {
+	 res[cur_row].bytes = res[cur_row].blocks = 0;
+	 return 0;
+      }else if (cur_size > flash_size)
+	 break;
+   }
+
+   logger_error(TEXT("flash_get_eblock_map: incorrect sector map. ")
+	 TEXT("Current summary sector size: %u. Flash size: %u\n"), cur_size, flash_size);
+
+   return -1;
+}
+
+unsigned flash_max_eblock_size(struct flash_erase_block_t *map)
+{
+   unsigned max_size;
+
+   max_size=0;
+   for(; map->blocks != 0; ++map) {
+      if (map->bytes > max_size)
+	 max_size = map->bytes;
+   }
+
+   return max_size;
+}
+
+unsigned flash_size_from_emap(struct flash_erase_block_t *map)
+{
+   unsigned size;
+
+   size=0;
+   for(; map->blocks != 0; map++)
+      size += map->blocks * map->bytes;
+
+   return size;
+}
+
+static struct flash_erase_block_t *flash_eblock_by_idx(struct flash_erase_block_t *map, unsigned i)
+{
+   unsigned nextb_first_idx;
+
+   nextb_first_idx=0;
+   while (map->blocks != 0) {
+      nextb_first_idx += map->blocks;
+      if (nextb_first_idx > i)
+	 break;
+      ++map;
+   }
+
+   return map;
+}
+
+static struct flash_erase_block_t *flash_eblock_by_addr(struct flash_erase_block_t *map, unsigned addr)
+{
+   unsigned nextb_first_addr;
+
+   nextb_first_addr=0;
+   while (map->blocks != 0) {
+      nextb_first_addr += map->bytes * map->blocks;
+      if (nextb_first_addr > addr)
+	 break;
+      ++map;
+   }
+
+   return map;
+}
