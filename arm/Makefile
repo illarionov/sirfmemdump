@@ -14,7 +14,7 @@
 # To rebuild project do "make clean" then "make all".
 #
 
-TCHAIN = arm-rtems4.10
+TCHAIN = arm-rtems
 
 # MCU name and submodel
 MCU      = arm7tdmi
@@ -66,7 +66,7 @@ FORMAT = binary
 # Optimization level, can be [0, 1, 2, 3, s].
 # 0 = turn off optimization. s = optimize for size.
 # (Note: 3 is not always the best optimization level. See avr-libc FAQ.)
-OPT = 2
+OPT = s
 #OPT = 0
 
 # Debugging format.

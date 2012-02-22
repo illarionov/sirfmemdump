@@ -263,24 +263,33 @@ static void flash_sdp_null_unprotect()
 static int flash_16b_program_word(unsigned addr, uint16_t word)
 {
    unsigned volatile i;
+   int err;
 
    flash_sdp_unprotect();
    flash[0x5555]=0xa0;
    flash[addr]=word;
 
    i=0;
+   err = -2;
 
-   while (flash[addr]!= word){
-      if (++i==50000)
-	 return -1;
+   while (flash[addr] != word){
+      if (++i==50000) {
+	 err = -1;
+	 break;
+      }
    }
 
-   return (flash[addr]==word) ? 0 : -2;
+   if (flash[addr] == word)
+      return 0;
+
+   flash_16b_read_array_mode();
+   return err;
 }
 
 int flash_16b_erase_sector(unsigned addr)
 {
    unsigned volatile i;
+   int err;
 
    flash_sdp_unprotect();
    flash[0x5555]=0x80;
@@ -288,12 +297,19 @@ int flash_16b_erase_sector(unsigned addr)
    flash[addr]=0x30;
 
    i=0;
+   err = -2;
    while(flash[addr]!=0xffff) {
-      if(++i>=50000)
-	 return -1;
+      if(++i>=50000) {
+	 err = -1;
+	 break;
+      }
    }
 
-   return flash[addr]==0xffff ? 0 : -2;
+   if (flash[addr]=0xffff)
+      return 0;
+
+   flash_16b_read_array_mode();
+   return err;
 }
 
 
