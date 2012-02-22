@@ -61,6 +61,7 @@ int flash_init(void);
 int flash_get_info(struct mdproto_cmd_flash_info_t *dst);
 int flash_16b_erase_sector(unsigned addr);
 int flash_16b_program(unsigned addr, void *buf, unsigned size);
+int flash_change_mode(unsigned mode);
 
 int main(void)
 {
@@ -136,7 +137,7 @@ int main(void)
 			   uart1_write((void *)&buf, pkt_size);
 			   pkt_size = (unsigned)mdproto_pkt_init(&buf, MDPROTO_CMD_MEM_READ_RESPONSE, NULL, 0);
 			}
-		     } /* while (from <= to) */ 
+		     } /* while (from <= to) */
 
 		     if (MDPROTO_CMD_SIZE(buf) > 0)
 			uart1_write((void *)&buf, pkt_size);
@@ -189,6 +190,17 @@ int main(void)
 		  struct mdproto_cmd_flash_info_t response;
 		  flash_get_info(&response);
 		  write_cmd_response(MDPROTO_CMD_FLASH_INFO_RESPONSE, (void *)&response, sizeof(response));
+	       }
+	       break;
+	    case MDPROTO_CMD_FLASH_CHANGE_MODE:
+	       if (MDPROTO_CMD_SIZE(buf) != 1+1)
+		  status = MDPROTO_STATUS_WRONG_PARAM;
+	       else {
+		  uint8_t res;
+
+		  flash_change_mode(buf.data.p[1]);
+		  res =  0;
+		  write_cmd_response(MDPROTO_CMD_FLASH_CHANGE_MODE_RESPONSE, (void *)&res, sizeof(res));
 	       }
 	       break;
 	    case MDPROTO_CMD_FLASH_ERASE_SECTOR:

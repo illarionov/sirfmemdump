@@ -45,7 +45,7 @@ void wait(unsigned n);
 
 int flash_init(void);
 int flash_get_info(struct mdproto_cmd_flash_info_t *dst);
-
+int flash_change_mode(unsigned mode);
 
 int flash_init()
 {
@@ -114,6 +114,18 @@ flash_16bit_done:
    } /* flash_bus_width=16 */
 
    return flash_bus_width;
+}
+
+int flash_change_mode(unsigned mode)
+{
+   if (mode == 0x98)
+      /* CFI */
+      flash_16b_cfi_query();
+  else if (mode == 0x90)
+     flash_16b_jedec_id_query();
+  else
+     flash_16b_read_array_mode();
+
 }
 
 int flash_get_info(struct mdproto_cmd_flash_info_t *dst)

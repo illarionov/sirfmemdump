@@ -27,7 +27,7 @@ USE_THUMB_MODE = YES
 # Target file name (without extension).
 TARGET = sirfmemdump
 
-PROGRAM_VERSION := $(git describe)
+PROGRAM_VERSION := $(shell git describe)
 
 # List C source files here. (C dependencies are automatically generated.)
 # use file-extension c for "c-only"-files
