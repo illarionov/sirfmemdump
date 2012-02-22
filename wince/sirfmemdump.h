@@ -36,6 +36,7 @@ INT_PTR CALLBACK change_gps_mode_callback(HWND hDlg, UINT message, WPARAM wParam
 INT_PTR CALLBACK program_word_callback(HWND dialog, UINT message, WPARAM wParam, LPARAM lParam);
 INT_PTR CALLBACK erase_sector_callback(HWND dialog, UINT message, WPARAM wParam, LPARAM lParam);
 INT_PTR CALLBACK program_flash_callback(HWND dialog, UINT message, WPARAM wParam, LPARAM lParam);
+INT_PTR CALLBACK change_flash_mode_callback(HWND dialog, UINT message, WPARAM wParam, LPARAM lParam);
 int refresh_status_wnd(struct serial_session_t *s, HWND status_wnd);
 
 
@@ -80,7 +81,8 @@ struct serial_session_t {
 		REQUEST_FLASH_INFO,
 		REQUEST_ERASE_SECTOR,
 		REQUEST_PROGRAM_WORD,
-		REQUEST_PROGRAM_FLASH
+		REQUEST_PROGRAM_FLASH,
+		REQUEST_CHANGE_FLASH_MODE
 	} request;
 	
 	union {
@@ -111,6 +113,9 @@ struct serial_session_t {
 		struct {
 			TCHAR firmare_fname[MAX_PATH];
 		} program_flash;
+		struct {
+			unsigned mode;
+		} change_flash_mode;
 	} req_ctx;
 };
 
@@ -152,6 +157,7 @@ int serial_session_req_flash_info(struct serial_session_t *s);
 int serial_session_req_program_word(struct serial_session_t *s, unsigned addr, unsigned word);
 int serial_session_req_erase_sector(struct serial_session_t *s, unsigned addr);
 int serial_session_req_program_flash(struct serial_session_t *s, const TCHAR *fname);
+int serial_session_req_change_flash_mode(struct serial_session_t *s, unsigned mode);
 
 /* Serial thread commands */
 int nmea_set_serial_state(struct serial_session_t *s,
@@ -173,6 +179,7 @@ int memdump_cmd_get_flash_info(struct serial_session_t *s);
 int memdump_cmd_erase_sector(struct serial_session_t *s);
 int memdump_cmd_program_word(struct serial_session_t *s);
 int memdump_cmd_program_flash(struct serial_session_t *s);
+int memdump_cmd_change_flash_mode(struct serial_session_t *s);
 
 int sirf_is_msg(const BYTE *buf, size_t buf_size);
 int nmea_is_msg(const BYTE *buf, size_t buf_size);

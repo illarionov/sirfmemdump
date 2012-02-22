@@ -256,6 +256,17 @@ BEGIN
     GROUPBOX        "Statistics",IDC_COM_PORT_TEXT,0,90,155,43
 END
 
+IDD_CHANGE_FLASH_MODE DIALOG  0, 0, 156, 49
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Dialog"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    LTEXT           "Mode:",IDC_STATIC,7,11,21,8,SS_CENTERIMAGE
+    PUSHBUTTON      "Cancel",IDCANCEL,42,28,50,14
+    DEFPUSHBUTTON   "Change",IDOK,100,28,50,14
+    COMBOBOX        IDC_FLASH_MODE,32,9,112,30,CBS_DROPDOWNLIST | CBS_SORT | WS_VSCROLL | WS_TABSTOP
+END
+
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -279,6 +290,14 @@ BEGIN
     BEGIN
         LEFTMARGIN, 4
         RIGHTMARGIN, 152
+    END
+
+    IDD_CHANGE_FLASH_MODE, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 149
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 42
     END
 END
 #endif    // APSTUDIO_INVOKED
@@ -307,6 +326,7 @@ BEGIN
         MENUITEM "Program word",                IDM_PROGRAM_WORD
         MENUITEM "Erase sector",                IDM_ERASE_SECTOR
         MENUITEM "Program flash",               IDM_PROGRAM_FLASH
+        MENUITEM "Change flash mode",           IDM_CHANGE_FLASH_MODE
         MENUITEM SEPARATOR
         MENUITEM "Dump memory",                 IDM_DUMP_MEM
         MENUITEM SEPARATOR

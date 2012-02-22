@@ -733,6 +733,33 @@ int serial_session_req_program_flash(struct serial_session_t *s, const TCHAR *fn
 	return 0;
 }
 
+int serial_session_req_change_flash_mode(struct serial_session_t *s, unsigned mode)
+{
+	int lock_res;
+	const TCHAR *err;
+
+	assert(s);
+
+	if ( (lock_res = serial_session_mtx_lock(s, 3000)) < 0)
+		return lock_res;
+
+	if (s->request != REQUEST_NONE) {
+		err = TEXT("Request in queue");
+		serial_session_set_error(s, 0, err);
+		return -1;
+	}
+
+	s->request = REQUEST_CHANGE_FLASH_MODE;
+	s->req_ctx.change_flash_mode.mode = mode;
+
+	serial_session_mtx_unlock(s);
+
+	serial_session_wakeup_rx_thread(s);
+
+	return 0;
+}
+
+
 
 static int serial_session_open_thread(struct serial_session_t *s)
 {
@@ -985,6 +1012,10 @@ static DWORD WINAPI serial_session_rx_thread(LPVOID s_p)
 				break;
 			case REQUEST_PROGRAM_FLASH:
 				memdump_cmd_program_flash(s);
+				s->request = REQUEST_NONE;
+				break;
+			case REQUEST_CHANGE_FLASH_MODE:
+				memdump_cmd_change_flash_mode(s);
 				s->request = REQUEST_NONE;
 				break;
 			default:

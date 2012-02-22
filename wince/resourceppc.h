@@ -23,6 +23,7 @@
 #define IDD_ERASE_SECTOR                134
 #define IDD_PROGRAM_WORD                135
 #define IDD_PROGRAM_FLASH               136
+#define IDD_CHANGE_FLASH_MODE           137
 #define IDC_STATIC_1                    201
 #define IDC_COM_PORT                    1000
 #define IDC_BUTTON_OPEN_COM_PORT        1001
@@ -58,6 +59,8 @@
 #define IDC_SRC_FILE_PICKER             1027
 #define IDC_STATS_ERRORS2               1028
 #define IDC_STATS_NMEA                  1028
+#define IDC_NEW_MODE                    1028
+#define IDC_FLASH_MODE                  1028
 #define IDM_COM_PORT                    32773
 #define IDM_DUMP                        32780
 #define IDM_PING                        32782
@@ -74,6 +77,8 @@
 #define IDM_ERASE_SECTOR                32794
 #define ID_MENU_PROGRAMFLASH            32795
 #define IDM_PROGRAM_FLASH               32796
+#define ID_MENU_CHANGEFLASHMODE         32797
+#define IDM_CHANGE_FLASH_MODE           32798
 #define IDM_OK                          40000
 #define IDM_HELP_ABOUT                  40002
 #define IDC_COM_PORT_TEXT               -1
@@ -85,8 +90,8 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NO_MFC                     1
 #define _APS_NEXT_RESOURCE_VALUE        137
-#define _APS_NEXT_COMMAND_VALUE         32797
-#define _APS_NEXT_CONTROL_VALUE         1028
+#define _APS_NEXT_COMMAND_VALUE         32799
+#define _APS_NEXT_CONTROL_VALUE         1029
 #define _APS_NEXT_SYMED_VALUE           111
 #endif
 #endif

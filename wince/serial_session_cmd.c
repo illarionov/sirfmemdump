@@ -1725,6 +1725,50 @@ cmd_program_flash_exit:
 }
 
 
+int memdump_cmd_change_flash_mode(struct serial_session_t *s)
+{
+	int lock_res;
+	int msg_size;
+	struct mdproto_cmd_buf_t cmd;
+    uint8_t mode_uint8;
+	   
+	assert(s);
+
+	if (lock_res = serial_session_mtx_lock(s, INFINITE) < 0)
+		return lock_res;
+
+	logger_debug(TEXT("Memdump: change flash mode to %02x"),
+		s->req_ctx.change_flash_mode.mode);
+
+	mode_uint8 = (uint8_t)s->req_ctx.change_flash_mode.mode;
+
+	msg_size = mdproto_pkt_init(&cmd, MDPROTO_CMD_CHANGE_FLASH_MODE, &mode_uint8, 
+		sizeof(mode_uint8));
+	assert(msg_size > 0);
+
+	PurgeComm(s->port_handle,
+			PURGE_TXABORT | PURGE_RXABORT | PURGE_TXCLEAR | PURGE_RXCLEAR);
+
+	if (switch_gps_mode(s, s->proto, PROTO_MEMDUMP) < 0)
+		return -1;
+
+	if (serial_session_write(s, &cmd, msg_size) < 0)
+		return -1;
+
+	if (read_mdproto_pkt(s, &cmd) < 0)
+		return -1;
+
+    if (cmd.data.id != MDPROTO_CMD_CHANGE_FLASH_MODE_RESPONSE) {
+		logger_error(TEXT("received wrong response code `0x%x`"), cmd.data.id);
+		serial_session_set_error(s, 0, TEXT("received wrong response code"));
+		return -1;
+	}
+
+	serial_session_mtx_unlock(s);
+	return 0;
+}
+
+
 
 int switch_gps_mode(struct serial_session_t *s, unsigned current, unsigned required)
 {

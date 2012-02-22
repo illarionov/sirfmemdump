@@ -389,6 +389,10 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
+				RelativePath=".\change_flash_mode_ui.c"
+				>
+			</File>
+			<File
 				RelativePath=".\change_gps_mode_ui.c"
 				>
 			</File>

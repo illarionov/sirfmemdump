@@ -247,7 +247,15 @@ INT_PTR CALLBACK WndProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 					serial_session_req_flash_info(current_session);
 					msg_handled = TRUE;
 					break;
-
+				case IDM_CHANGE_FLASH_MODE:
+					DialogBoxParam(g_hInst,
+						(LPCTSTR)IDD_CHANGE_FLASH_MODE,
+						hDlg,
+						change_flash_mode_callback,
+						(LPARAM)&current_session
+						);
+					msg_handled = TRUE;
+					break;
                 case IDOK:
 				case IDCANCEL:
 				case IDABORT:
@@ -421,6 +429,7 @@ static int refresh_mainmenu()
 		IDM_PROGRAM_WORD,
 		IDM_ERASE_SECTOR,
 		IDM_PROGRAM_FLASH,
+		IDM_CHANGE_FLASH_MODE,
 		0
 	};
 	unsigned enabled;
