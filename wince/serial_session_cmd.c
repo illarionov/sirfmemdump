@@ -1370,6 +1370,8 @@ int memdump_cmd_program_word(struct serial_session_t *s)
 		s->req_ctx.program_word.word
 		);
 
+	t_req.addr = htonl(s->req_ctx.program_word.addr);
+	t_req.payload = htons(s->req_ctx.program_word.word);
 	msg_size = mdproto_pkt_init(&cmd, MDPROTO_CMD_FLASH_PROGRAM, &t_req, 
 		sizeof(t_req));
 	assert(msg_size > 0);
