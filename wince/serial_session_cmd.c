@@ -56,7 +56,8 @@ static int read_mdproto_pkt(struct serial_session_t *s, struct mdproto_cmd_buf_t
 static int close_dump_request(struct serial_session_t *s);
 
 static int get_flash_info(struct serial_session_t *s, struct mdproto_cmd_flash_info_t *res);
-static int dump_mem(struct serial_session_t *s, unsigned src_addr, unsigned size, uint8_t *dst);
+static int dump_mem(struct serial_session_t *s, unsigned src_addr,
+					unsigned size, uint8_t *dst, unsigned print_status);
 static int erase_sector(struct serial_session_t *s, unsigned addr);
 static int program_sector(struct serial_session_t *s,
 						  unsigned addr,
@@ -1124,7 +1125,12 @@ int memdump_cmd_ping(struct serial_session_t *s)
 	return 0;
 }
 
-static int dump_mem(struct serial_session_t *s, unsigned src_addr, unsigned size, uint8_t *dst)
+static int dump_mem(struct serial_session_t *s,
+					unsigned src_addr,
+					unsigned size,
+					uint8_t *dst,
+					unsigned print_status
+					)
 {
 	unsigned dst_addr;
 	int write_size;
@@ -1143,12 +1149,8 @@ static int dump_mem(struct serial_session_t *s, unsigned src_addr, unsigned size
 	req.dst = htonl(dst_addr);
 	write_size = mdproto_pkt_init(&cmd, MDPROTO_CMD_MEM_READ, &req, sizeof(req));
 
-	if (serial_session_is_open(s))
-		PurgeComm(s->port_handle,
+	PurgeComm(s->port_handle,
 			PURGE_TXABORT | PURGE_RXABORT | PURGE_TXCLEAR | PURGE_RXCLEAR);
-
-	if (switch_gps_mode(s, s->req_ctx.dump.gps_mode, PROTO_MEMDUMP) < 0)
-		return -1;
 
 	if (serial_session_write(s, &cmd, write_size) < 0)
 		return -1;
@@ -1157,7 +1159,8 @@ static int dump_mem(struct serial_session_t *s, unsigned src_addr, unsigned size
 	while (src_addr <= dst_addr) {
 		int read_res;
 
-		logger_info(TEXT("0x%x..."), src_addr);
+		if (print_status)
+			logger_info(TEXT("0x%x..."), src_addr);
 		read_res = read_mdproto_pkt(s, &cmd);
 
 		if (read_res < 0
@@ -1202,9 +1205,12 @@ int memdump_cmd_dump(struct serial_session_t *s)
 		return res;
 	}
 
+	if (switch_gps_mode(s, s->req_ctx.dump.gps_mode, PROTO_MEMDUMP) < 0)
+		return -1;
+
 	dump_mem(s, s->req_ctx.dump.addr_from, 
 		s->req_ctx.dump.addr_to - s->req_ctx.dump.addr_from + 1,
-		s->req_ctx.dump.f_view);
+		s->req_ctx.dump.f_view, 1);
 
 	res = close_dump_request(s);
 	serial_session_mtx_unlock(s);
@@ -1429,17 +1435,14 @@ static int erase_sector(struct serial_session_t *s, unsigned addr)
 	struct mdproto_cmd_buf_t cmd;
     uint32_t addr_uint32;
 
-	addr_uint32 = (uint32_t)addr;
+	addr_uint32 = (uint32_t)htonl(addr);
 
-	msg_size = mdproto_pkt_init(&cmd, MDPROTO_CMD_FLASH_PROGRAM, &addr_uint32, 
+	msg_size = mdproto_pkt_init(&cmd, MDPROTO_CMD_FLASH_ERASE_SECTOR, &addr_uint32, 
 		sizeof(addr));
 	assert(msg_size > 0);
 
 	PurgeComm(s->port_handle,
 			PURGE_TXABORT | PURGE_RXABORT | PURGE_TXCLEAR | PURGE_RXCLEAR);
-
-	if (switch_gps_mode(s, s->proto, PROTO_MEMDUMP) < 0)
-		return -1;
 
 	if (serial_session_write(s, &cmd, msg_size) < 0)
 		return -1;
@@ -1482,8 +1485,14 @@ int memdump_cmd_erase_sector(struct serial_session_t *s)
 	if (lock_res = serial_session_mtx_lock(s, INFINITE) < 0)
 		return lock_res;
 
+	if (switch_gps_mode(s, s->proto, PROTO_MEMDUMP) < 0) {
+		serial_session_mtx_unlock(s);
+		return -1;
+	}
+
 	logger_debug(TEXT("Memdump: erase-sector %08x"),
 		s->req_ctx.erase_sector.addr);
+
 
 	if (erase_sector(s, s->req_ctx.erase_sector.addr) != 0)
 		return -1;
@@ -1512,8 +1521,8 @@ static int program_sector(struct serial_session_t *s,
 	assert(sizeof(t_req.payload) >= 4);
 
 	res = erase_sector(s, addr);
-	if (res != 0)
-		return res;
+	/* if (res != 0)
+		return res; */
 
 	while (data_size != 0) {
 
@@ -1649,7 +1658,7 @@ int memdump_cmd_program_flash(struct serial_session_t *s)
 	}
 
 	if (flash_size_from_emap(sector_map) < prom_file_size) {
-		logger_error(TEXT("firmware size larger (%lu) than flash size (%lu)\n"),
+		logger_error(TEXT("firmware size larger (%lu) than flash size (%lu)"),
 			(unsigned long)prom_file_size,
 			(unsigned long)flash_size_from_emap(sector_map)
 			);
@@ -1681,10 +1690,10 @@ int memdump_cmd_program_flash(struct serial_session_t *s)
 		}else if (read_size == 0)
 			break;
 
-		logger_info(TEXT("0x%08x: sector_size: %u bytes\n"), eblock_addr, sector_size);
+		logger_info(TEXT("0x%08x: sector_size: %u bytes"), eblock_addr, sector_size);
 
 		/* Read sector from flash  */
-		if (dump_mem(s, EXT_SRAM_CSN0+eblock_addr, sector_size, flash_sector) != 0) {
+		if (dump_mem(s, EXT_SRAM_CSN0+eblock_addr, sector_size, flash_sector, 0) != 0) {
 			assert(s->last_err_msg[0] != 0);
 			goto cmd_program_flash_exit;
 		}
@@ -1696,9 +1705,10 @@ int memdump_cmd_program_flash(struct serial_session_t *s)
 			logger_info(TEXT("Match"));
 		}else {
 			logger_info(TEXT("Reprogramming sector..."));
-			if (program_sector(s, eblock_addr, file_sector, sector_size) != 0)
+			if (program_sector(s, eblock_addr, file_sector, sector_size) != 0) {
 				assert(s->last_err_msg[0] != 0);
 				goto cmd_program_flash_exit;
+			}
 		}
 
 		if ((unsigned)read_size < sector_size)
@@ -1721,6 +1731,11 @@ cmd_program_flash_exit:
 	free(flash_sector);
 	free(file_sector);
 	CloseHandle(prom_fd);
+
+	if (res != 0)
+		logger_info(TEXT("program flash error"));
+	else
+		logger_info(TEXT("OK"));
   
 	serial_session_mtx_unlock(s);
 	return res;

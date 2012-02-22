@@ -27,7 +27,7 @@ const struct {
 } FLASH_LIST[] = {
    {
       /* Spansion S29AL004D bottom boot block  */
-      0x22b9, 0x22ba, TEXT("Spansion"), TEXT("AM29LV400BB"),
+      0x01, 0x22ba, TEXT("Spansion"), TEXT("AM29LV400BB"),
       { {1, 16384}, {2, 8192}, {1, 32768}, {7, 65536}, {0, 0}  }
    }
 };

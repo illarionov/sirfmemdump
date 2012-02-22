@@ -104,13 +104,13 @@ static int request_erase_sector(HWND dialog, struct serial_session_t *s)
 
 	if (!s) {
 		res = -1, err_msg = TEXT("Not connected");
-		goto request_dump_end;
+		goto request_erase_sector_end;
 	}
 
 	/* Sector address */
 	if (GetDlgItemText(dialog, IDC_SECTOR_ADDR, tmp, sizeof(tmp)/sizeof(tmp[0])) < 1) {
 		res = -1, err_msg = TEXT("Wrong flash sector address");
-		goto request_dump_end;
+		goto request_erase_sector_end;
 	}
 
 	addr = _tcstoul(tmp, &endptr, 0);
@@ -119,7 +119,7 @@ static int request_erase_sector(HWND dialog, struct serial_session_t *s)
 		|| (addr > 0xffffffff)
 		) {
 		res = -1, err_msg = TEXT("Address is not a number");
-		goto request_dump_end;
+		goto request_erase_sector_end;
 	}
 
 	DEFAULT_SECTOR_ADDR = addr;
@@ -133,7 +133,7 @@ static int request_erase_sector(HWND dialog, struct serial_session_t *s)
 		err_msg = tmp;
 	}
 
-request_dump_end:
+request_erase_sector_end:
 	if (err_msg)
 		MessageBox(dialog, err_msg, NULL, MB_OK | MB_ICONERROR);
 

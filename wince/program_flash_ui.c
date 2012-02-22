@@ -17,8 +17,10 @@
 #include "stdafx.h"
 #include "sirfmemdump.h"
 
-static int init_dialog_controls(HWND dialog, struct serial_session_t *s);
+static TCHAR FIRMWARE_FILE[MAX_PATH] = TEXT("firmware.bin");
 
+static int init_dialog_controls(HWND dialog, struct serial_session_t *s);
+static int request_program_flash(HWND dialog, struct serial_session_t *s);
 
 INT_PTR CALLBACK program_flash_callback(HWND dialog, UINT message, WPARAM wParam, LPARAM lParam)
 {
@@ -63,8 +65,11 @@ INT_PTR CALLBACK program_flash_callback(HWND dialog, UINT message, WPARAM wParam
 						ofn.hwndOwner = dialog;
 						ofn.lpstrFile = fname;
 						ofn.nMaxFile = MAX_PATH;
+						ofn.lpstrFilter = TEXT("Binary\0*.bin\0All\0*.*\0");
+						ofn.nFilterIndex = 1;
 						ofn.lpstrTitle = TEXT("Select firmware file");
-						ofn.Flags = OFN_HIDEREADONLY; 
+						ofn.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST |
+							OFN_HIDEREADONLY; 
 						GetDlgItemText(dialog, IDC_SRC_FILE, fname,
 							sizeof(fname)/sizeof(fname[0]));
 						if (GetOpenFileName(&ofn))
@@ -74,7 +79,8 @@ INT_PTR CALLBACK program_flash_callback(HWND dialog, UINT message, WPARAM wParam
 					}
 					break;
 				case IDOK:
-					close_dialog = TRUE;
+					if (request_program_flash(dialog, *current_session) >= 0)
+						close_dialog = TRUE;
 					msg_handled = TRUE;
 					break;
 				case IDCANCEL:
@@ -98,5 +104,43 @@ INT_PTR CALLBACK program_flash_callback(HWND dialog, UINT message, WPARAM wParam
 
 static int init_dialog_controls(HWND dialog, struct serial_session_t *s)
 {
+	SetDlgItemText(dialog, IDC_SRC_FILE, FIRMWARE_FILE);
 	return 0;
+}
+
+static int request_program_flash(HWND dialog, struct serial_session_t *s)
+{
+	int res;
+	const TCHAR *err_msg;
+	TCHAR tmp[MAX_PATH];
+
+	res = 0;
+	err_msg = NULL;
+
+	if (!s) {
+		res = -1, err_msg = TEXT("Not connected");
+		goto request_program_flash_end;
+	}
+
+	/* Firmware file */
+	if (GetDlgItemText(dialog, IDC_SRC_FILE, tmp, sizeof(tmp)/sizeof(tmp[0])) < 1) {
+		res = -1, err_msg = TEXT("Wrong firmware file");
+		goto request_program_flash_end;
+	}
+
+	_tcsncpy(FIRMWARE_FILE, tmp, sizeof(FIRMWARE_FILE)/sizeof(FIRMWARE_FILE[0]));
+	res = serial_session_req_program_flash(s, tmp);
+	if (res == -WAIT_TIMEOUT)
+		err_msg = TEXT("Busy");
+	else if (res < 0) {
+		tmp[0]=0;
+		serial_session_error(s, tmp, sizeof(tmp)/sizeof(tmp[0]));
+		err_msg = tmp;
+	}
+
+request_program_flash_end:
+	if (err_msg)
+		MessageBox(dialog, err_msg, NULL, MB_OK | MB_ICONERROR);
+
+	return res;
 }
