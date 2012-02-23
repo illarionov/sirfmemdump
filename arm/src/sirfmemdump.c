@@ -30,12 +30,18 @@ static volatile uint16_t *RF_VERSION    = (uint16_t *)0x80010010;
 static volatile uint16_t *GPS_VERSION   = (uint16_t *)0x80010020;
 static volatile uint16_t *CLOCK_SELECT  = (uint16_t *)0x80010014;
 static volatile uint16_t *CLOCK_DIVIDER = (uint16_t *)0x8001002c;
+/*
+static volatile uint16_t *RTC_MIN_SEC   = (uint16_t *)0x80010030;
+static volatile uint16_t *RTC_DAY_HOUR  = (uint16_t *)0x80010034;
+*/
 static volatile uint16_t *UNK_80010060  = (uint16_t *)0x80010060;
 static volatile uint16_t *GPIO_SEL      = (uint16_t *)0x80010100;
 static volatile uint16_t *GPIO0_STATE0  = (uint16_t *)0x80010104;
 
+/*
 static volatile uint32_t *GPIO_PORTVAL0  = (uint32_t *)0x80010120;
 static volatile uint32_t *GPIO_PORTDIR0  = (uint32_t *)0x80010134;
+*/
 
 static volatile uint16_t *UNK_80050000 = (uint16_t *)0x80050000;
 static volatile uint16_t *UNK_80050002 = (uint16_t *)0x80050002;
@@ -68,10 +74,12 @@ int main(void)
    uint8_t status;
 
    init2();
-   flash_init();
+
    wait(1000);
    uart1_reset();
-   uart1_write("+++", 3);
+   uart1_write("+", 1);
+   flash_init();
+   uart1_write("++", 2);
 
    status = MDPROTO_STATUS_OK;
 

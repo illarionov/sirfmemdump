@@ -25,7 +25,6 @@
 
 #define EXT_SRAM_CSN0 0x40000000
 
-extern volatile enum sirfgps_version_e gps_version; /* sirfmemdump.c */
 
 static void flash_sdp_null_unprotect(void);
 static void flash_sdp_16b_unprotect(void);
@@ -35,6 +34,11 @@ static void flash_16b_read_array_mode(void);
 static int flash_16b_program_word(unsigned addr, uint16_t word);
 int flash_16b_erase_sector(unsigned addr);
 int flash_16b_program(unsigned addr, void *buf, unsigned size);
+
+extern volatile enum sirfgps_version_e gps_version; /* sirfmemdump.c */
+
+static volatile uint16_t *UNK_80010000 __attribute__((aligned(__alignof__(uint16_t)))) = (uint16_t *)0x80010000;
+static volatile uint16_t *UNK_80090000 __attribute__((aligned(__alignof__(uint16_t)))) = (uint16_t *)0x80090000;
 
 static volatile uint16_t *flash __attribute__((aligned(__alignof__(uint16_t))));
 static volatile unsigned flash_bus_width = 16;
@@ -49,7 +53,7 @@ int flash_change_mode(unsigned mode);
 
 int flash_init()
 {
-   uint16_t orig[2];
+   const unsigned chip_id=0;
 
    /* EXT SRAM Base address */
    flash = (uint16_t *)EXT_SRAM_CSN0;
@@ -58,18 +62,17 @@ int flash_init()
    flash_bus_width = 16;
 
    if(gps_version == GPS3) {
-      volatile uint16_t *unk80010000;
-      unsigned v;
-
-      unk80010000 = (uint16_t *)0x80010000;
-      v = (*unk80010000 >> 2) & 0x03;
-      if (v == 0x02)
+      if (((*UNK_80010000 >> 2) & 0x03) == 0x02)
 	 flash_bus_width = 32;
+
+      /*  UNK_80090000[0] = flash_bus_width 0xf055; */
+      UNK_80090000[chip_id*2] = (
+	 0xf010
+	 | (chip_id << 8)
+	 | (flash_bus_width == 16 ? 0x40 : 0x50))+6;
    }
 
    if (flash_bus_width == 16) {
-      orig[0] = flash[0];
-      orig[1] = flash[1];
 
       flash_sdp_unprotect = &flash_sdp_null_unprotect;
       flash_16b_cfi_query();
@@ -95,22 +98,10 @@ int flash_init()
 	 goto flash_16bit_done;
       }
 
-      /* JEDEC ID request (on 0 address) */
-      flash_sdp_unprotect();
-      flash[0] = 0x90;
-      if (flash[0] == 0x90) {
-	 /* SRAM device */
-	 flash[0]=orig[0];
-	 flash[1]=orig[1];
-	 flash_bus_width=0;
-	 return 0;
-      }
-
       /* JEDEC flash device (with SDP) */
 
 flash_16bit_done:
       flash_16b_read_array_mode();
-      return 0;
    } /* flash_bus_width=16 */
 
    return flash_bus_width;
@@ -126,6 +117,7 @@ int flash_change_mode(unsigned mode)
   else
      flash_16b_read_array_mode();
 
+  return 0;
 }
 
 int flash_get_info(struct mdproto_cmd_flash_info_t *dst)
