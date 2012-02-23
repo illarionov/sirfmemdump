@@ -78,6 +78,7 @@ static void help(void)
    "    -p  <tty>,     Serial port, default: " DEFAULT_PORT "\n"
    "    -l, <loader>   Injected loader, default: " DEFAULT_LOADER "\n"
    "    -n,            Do not inject loader\n"
+   "    -i,            Do not switch from sirf to internal boot mode\n"
    "    -v,            Verbosity level \n"
    "    -h,            Help\n"
    "    -V,            Show version\n"
@@ -95,7 +96,7 @@ static void help(void)
 }
 
 
-int inject_loader(int pfd, struct termios *term, const char *lname)
+int inject_loader(int pfd, struct termios *term, const char *lname, int switch_from_sirf)
 {
    const char wait_result[]="+++";
    int lfd;
@@ -162,14 +163,16 @@ int inject_loader(int pfd, struct termios *term, const char *lname)
 	  return 1;
   }
 
-  gpsd_report(LOG_PROG, "Switching to internal boot mode...\n");
-  if (sirfEnterInternalBootMode(pfd) == -1) {
-     (void)free(loader);
-     gpsd_report(LOG_ERROR, "sirfEnterInternalBootmode() error \n");
-     return 1;
+  if (switch_from_sirf) {
+     gpsd_report(LOG_PROG, "Switching to internal boot mode...\n");
+     if (sirfEnterInternalBootMode(pfd) == -1) {
+	(void)free(loader);
+	gpsd_report(LOG_ERROR, "sirfEnterInternalBootmode() error \n");
+	return 1;
+     }
   }
 
-  gpsd_report(LOG_PROG, "sending loader...\n");
+  gpsd_report(LOG_PROG, "Sending loader...\n");
 
   /* send the bootstrap/flash programmer */
   if (sirfSendLoader(pfd, term, loader, ls) == -1) {
@@ -179,7 +182,7 @@ int inject_loader(int pfd, struct termios *term, const char *lname)
   }
   (void)free(loader);
 
-  gpsd_report(LOG_PROG, "unblocking signals...\n");
+  gpsd_report(LOG_PROG, "Unblocking signals...\n");
 
   if(sigprocmask(SIG_UNBLOCK, &sigset, NULL) == -1) {
 	  gpsd_report(LOG_ERROR,"sigprocmask\n");
@@ -187,7 +190,7 @@ int inject_loader(int pfd, struct termios *term, const char *lname)
   }
 
   /* sirfSetProto(pfd, &term, PROTO_NMEA, 4800); */
-  gpsd_report(LOG_PROG, "finished.\n");
+  gpsd_report(LOG_PROG, "Finished.\n");
 
   if (expect(pfd, wait_result, strlen(wait_result), 30) != 0) {
      gpsd_report(LOG_PROG, "Loader successfully launched\n");
@@ -348,6 +351,7 @@ main(int argc, char **argv){
 	int ch;
 	int pfd;
 	int do_inject_loader = 1;
+	int do_switch_from_sirf = 1;
 	int res = 0;
 	int argnum;
 	char *lname = DEFAULT_LOADER;
@@ -356,7 +360,7 @@ main(int argc, char **argv){
 
 	progname = argv[0];
 
-	while ((ch = getopt(argc, argv, "l:Vv:p:n")) != -1)
+	while ((ch = getopt(argc, argv, "l:Vv:p:ni")) != -1)
 		switch (ch) {
 		case 'l':
 			lname = optarg;
@@ -369,6 +373,9 @@ main(int argc, char **argv){
 			break;
 	        case 'n':
 			do_inject_loader = 0;
+			break;
+	        case 'i':
+			do_switch_from_sirf = 0;
 			break;
 		case 'V':
 			version();
@@ -391,7 +398,7 @@ main(int argc, char **argv){
 	memset(&term, 0, sizeof(term));
 
 	if (do_inject_loader) {
-	   res = inject_loader(pfd, &term, lname);
+	   res = inject_loader(pfd, &term, lname, do_switch_from_sirf);
 	   if (res != 0)
 	      goto end;
 	}
