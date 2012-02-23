@@ -317,7 +317,7 @@ int flash_16b_erase_sector(unsigned addr)
       }
    }
 
-   if (flash[addr]=0xffff)
+   if (flash[addr] == 0xffff)
       return 0;
 
    flash_16b_read_array_mode();
