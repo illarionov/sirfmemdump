@@ -277,7 +277,7 @@ static int flash_16b_program_word(unsigned addr, uint16_t word)
    err = -2;
 
    while (flash[addr] != word){
-      if (++i==50000) {
+      if (++i==1000000) {
 	 err = -1;
 	 break;
       }
@@ -303,7 +303,7 @@ int flash_16b_erase_sector(unsigned addr)
    i=0;
    err = -2;
    while(flash[addr]!=0xffff) {
-      if(++i>=50000) {
+      if(++i>=1000000) {
 	 err = -1;
 	 break;
       }
