@@ -22,7 +22,7 @@
 #include "StdAfx.h"
 #include "sirfmemdump.h"
 
-#define BUF_SIZE 4096
+#define BUF_SIZE 32768
 #define LOG_MSG_MAX_LEN 320
 
 static int logger_vslog(unsigned log_level, const TCHAR *fmt, va_list args);

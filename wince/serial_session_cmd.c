@@ -953,6 +953,9 @@ sirf_dump_cmd_end:
 int internal_boot_send_loader(struct serial_session_t *s)
 {
 #pragma pack(push, 1)
+	const struct {
+		uint8_t u0, u1;
+	} header0 = {0xe5, 0};
 	struct {
 		uint8_t s;
 		uint8_t boost;
@@ -1023,11 +1026,21 @@ int internal_boot_send_loader(struct serial_session_t *s)
 		return -1;
 	}
 
+	/* Header0 */
+	if (serial_session_write(s, &header0, sizeof(header0)) < 0) {
+		serial_session_mtx_unlock(s);
+		return -1;
+	}
+
+	Sleep(100);
+
 	/* Header */
 	if (serial_session_write(s, &header, sizeof(header)) < 0) {
 		serial_session_mtx_unlock(s);
 		return -1;
 	}
+
+	Sleep(100);
 
 	/* Loader */
 	if (serial_session_write(s, loader, loader_size) < 0) {
@@ -1509,6 +1522,7 @@ static int program_sector(struct serial_session_t *s,
 	int res;
 	int write_size;
 	unsigned chunk_size;
+	int errs_cnt;
 	struct mdproto_cmd_buf_t cmd;
 #pragma pack(push, 1)
 	struct {
@@ -1520,9 +1534,12 @@ static int program_sector(struct serial_session_t *s,
 	assert((sizeof(t_req.payload) % 4) == 0);
 	assert(sizeof(t_req.payload) >= 4);
 
+	errs_cnt = 0;
 	res = erase_sector(s, addr);
-	/* if (res != 0)
-		return res; */
+	 if (res != 0)
+		errs_cnt += 1;
+
+	serial_session_set_error(s, 0, NULL);
 
 	while (data_size != 0) {
 
@@ -1554,30 +1571,35 @@ static int program_sector(struct serial_session_t *s,
 		PurgeComm(s->port_handle,
 			PURGE_TXABORT | PURGE_RXABORT | PURGE_TXCLEAR | PURGE_RXCLEAR);
 
-		if (serial_session_write(s, &cmd, write_size) < 0)
-			return -1;
+		if (serial_session_write(s, &cmd, write_size) < 0) {
+			errs_cnt += 1;
+			continue;
+		}
 
-		if (read_mdproto_pkt(s, &cmd) < 0)
-			return -1;
+		if (read_mdproto_pkt(s, &cmd) < 0) {
+			errs_cnt += 1;
+			continue;
+		}
 
 		if (cmd.data.id != MDPROTO_CMD_FLASH_PROGRAM_RESPONSE) {
 			logger_error(TEXT("received wrong response code `0x%x`"), cmd.data.id);
 			serial_session_set_error(s, 0, TEXT("received wrong response code"));
-			return -1;
+			errs_cnt += 1;
+			continue;
 		}
 
 		if (ntohs(cmd.size) != 1+1) {
 			logger_error(TEXT("received wrong response size `0x%u` != `0x%u`"), (unsigned)ntohs(cmd.size),
 				1+1);
 			serial_session_set_error(s, 0, TEXT("received wrong response size"));
-			return -1;
+			errs_cnt += 1;
+			continue;
 		}
 
-		if (cmd.data.p[1] == 0) {
-			serial_session_set_error(s, 0, NULL);
-			logger_info(TEXT("OK"));
-		} else {
-			logger_error(TEXT("erase-sector error %i"), (int)cmd.data.p[1]);
+		if (cmd.data.p[1] != 0) {
+			int d0;
+			d0 = (int8_t)cmd.data.p[1];
+			logger_error(TEXT("erase-sector error %i"), d0);
 			serial_session_set_error(s, 0, TEXT("erase-sector error"));
 		}
 
@@ -1585,11 +1607,18 @@ static int program_sector(struct serial_session_t *s,
 		if (res != 0) {
 			logger_error(TEXT("program-flash error %i"), res);
 			serial_session_set_error(s, 0, TEXT("program-flash error"));
-			return -1;
+			errs_cnt += 1;
+			continue;
 		}
 	}
 
-	return 0;
+	if (errs_cnt > 0) {
+		logger_error(TEXT("%i errors"), errs_cnt);
+		if (s->last_err_msg[0] == 0)
+			serial_session_set_error(s, 0, TEXT("some errors"));
+	}
+
+	return errs_cnt;
 }
 
 
@@ -1704,8 +1733,10 @@ int memdump_cmd_program_flash(struct serial_session_t *s)
 		if (memcmp(file_sector, flash_sector, read_size) == 0) {
 			logger_info(TEXT("Match"));
 		}else {
+			int errs_cnt;
 			logger_info(TEXT("Reprogramming sector..."));
-			if (program_sector(s, eblock_addr, file_sector, sector_size) != 0) {
+			errs_cnt = program_sector(s, eblock_addr, file_sector, sector_size);
+			if (errs_cnt != 0) {
 				assert(s->last_err_msg[0] != 0);
 				goto cmd_program_flash_exit;
 			}
