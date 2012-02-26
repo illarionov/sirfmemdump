@@ -37,7 +37,7 @@
 #include "arm/include/mdproto.h"
 
 const char *progname = "sirfmemdump";
-const char *revision = "$Revision: 0.0 $";
+const char *revision = "$Revision: 0.2 $";
 static int verbosity = 3;
 
 void gpsd_report(int errlevel, const char *fmt, ... )
