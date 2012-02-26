@@ -953,9 +953,6 @@ sirf_dump_cmd_end:
 int internal_boot_send_loader(struct serial_session_t *s)
 {
 #pragma pack(push, 1)
-	const struct {
-		uint8_t u0, u1;
-	} header0 = {0xe5, 0};
 	struct {
 		uint8_t s;
 		uint8_t boost;
@@ -1026,21 +1023,11 @@ int internal_boot_send_loader(struct serial_session_t *s)
 		return -1;
 	}
 
-	/* Header0 */
-	if (serial_session_write(s, &header0, sizeof(header0)) < 0) {
-		serial_session_mtx_unlock(s);
-		return -1;
-	}
-
-	Sleep(100);
-
 	/* Header */
 	if (serial_session_write(s, &header, sizeof(header)) < 0) {
 		serial_session_mtx_unlock(s);
 		return -1;
 	}
-
-	Sleep(100);
 
 	/* Loader */
 	if (serial_session_write(s, loader, loader_size) < 0) {
