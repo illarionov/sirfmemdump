@@ -396,6 +396,9 @@ int serial_session_write(struct serial_session_t *s, const void *msg, size_t msg
 		return -1;
 	}
 
+    /* XXX: 'mdproto messsage too big' bug workaround */
+    Sleep(10);
+
 	DEBUGMSG(TRUE, (TEXT("writefile() msg_size=%u\n"), msg_size));
 	if (!WriteFile(s->port_handle, msg, msg_size, &written, NULL)) {
 		if (GetLastError() == ERROR_OPERATION_ABORTED)
