@@ -277,13 +277,15 @@ sirfSetProto(int pfd, struct termios *term, unsigned int speed, unsigned int pro
 
 	/* send at whatever baud we're currently using */
 	(void)sirf_write(pfd, sirf);
-	nmea_lowlevel_send(pfd, "$PSRF100,%u,%u,8,1,0", speed, proto);
+	write(pfd, "\r\n", 2);
+	nmea_lowlevel_send(pfd, "$PSRF100,%u,%u,8,1,0", proto, speed);
 
 	/* now spam the receiver with the config messages */
 	for(i = 0; i < (int)(sizeof(spd)/sizeof(spd[0])); i++) {
 		(void)serialSpeed(pfd, term, spd[i]);
 		(void)sirf_write(pfd, sirf);
-		nmea_lowlevel_send(pfd, "$PSRF100,%u,%u,8,1,0", speed, proto);
+		write(pfd, "\r\n", 2);
+		nmea_lowlevel_send(pfd, "$PSRF100,%u,%u,8,1,0", proto, speed);
 		(void)tcdrain(pfd);
 		(void)usleep(100000);
 	}

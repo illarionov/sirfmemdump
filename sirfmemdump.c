@@ -106,7 +106,7 @@ int inject_loader(int pfd, struct termios *term, const char *lname, int switch_f
    struct stat sb;
 
   /* there may be a type-specific setup method */
-  if(sirfSetProto(pfd, term, PROTO_SIRF, 38400) == -1) {
+  if(sirfSetProto(pfd, term, 38400, PROTO_SIRF) == -1) {
      gpsd_report(LOG_ERROR, "port_setup()\n");
      return 1;
   }
