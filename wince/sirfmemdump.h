@@ -17,7 +17,7 @@
 #pragma once
 #include "resourceppc.h"
 
-#define SIRFMEMDUMP_VERSION TEXT("v0.2")
+#define SIRFMEMDUMP_VERSION TEXT("v0.3")
 #define SIRFMEMDUMP_HOMEPAGE TEXT("http://github.com/littlesavage/sirfmemdump")
 
 #define DEFAULT_COMPORT TEXT("COM1")
