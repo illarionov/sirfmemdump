@@ -759,6 +759,7 @@ int sirf_enter_internal_boot_mode(struct serial_session_t *s)
 	size_t msg_len;
 	unsigned rcvd;
 	int lock_res;
+	unsigned i;
 	BYTE msg[10];
 
 	assert(s);
@@ -783,21 +784,37 @@ int sirf_enter_internal_boot_mode(struct serial_session_t *s)
 		return -1;
 	}
 
-	Sleep(1000);
-	PurgeComm(s->port_handle, PURGE_RXABORT  | PURGE_RXCLEAR);
+	/* Chipset should not send any data in internal boot mode */
+	rcvd=0;
+	i=0;
+	do {
+		unsigned purged=0;
 
-	rcvd = serial_session_read(s, msg, sizeof(msg), 3000);
-	if (rcvd < 0) {
-		serial_session_mtx_unlock(s);
-		return -1;
-	}
+		/* Purge device output queue */
+		do {
+			rcvd = serial_session_read(s, msg, sizeof(msg), 100);
+			purged += rcvd;
+		} while ((rcvd == sizeof(msg)) && (purged < 50000));
+		if (rcvd < 0) {
+			serial_session_mtx_unlock(s);
+			return -1;
+		}
+		DEBUGMSG(purged > 0, (TEXT("flushed %u bytes\n"), purged));
+		
+		rcvd = serial_session_read(s, msg, sizeof(msg), 1500);
+		if (rcvd < 0) {
+			serial_session_mtx_unlock(s);
+			return -1;
+		}
 
+	} while ( (rcvd > 0) && (++i < 3));
+		
 	if (rcvd > 0) {
-		logger_error(TEXT("Received data after switching"));
-		serial_session_set_error(s, 0, TEXT("Received data after enter"));
+		logger_error(TEXT("Can not switch to internal boot mode: received data after mid 94 request"));
+		serial_session_set_error(s, 0, TEXT("Received data"));
 		serial_session_mtx_unlock(s);
 		return -1;
-	}
+	}	
 
 	s->proto = PROTO_INTERNAL_BOOT_MODE;
 	logger_info(TEXT("Done"));
