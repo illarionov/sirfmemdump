@@ -51,6 +51,7 @@ static unsigned sirf_payload_csum(const BYTE *payload, unsigned payload_size);
 static int mdproto_pkt_init(struct mdproto_cmd_buf_t *buf,
       unsigned cmd_id, const void *raw_data, unsigned raw_data_size);
 static uint8_t mdproto_pkt_csum(const void *buf, size_t size);
+static int read_mdproto_header(struct serial_session_t *s, struct mdproto_cmd_buf_t *dst);
 static int read_mdproto_pkt(struct serial_session_t *s, struct mdproto_cmd_buf_t *dst);
 
 static int close_dump_request(struct serial_session_t *s);
@@ -492,6 +493,63 @@ static uint8_t mdproto_pkt_csum(const void *buf, size_t size)
    return (uint8_t)(0 - csum);
 }
 
+
+static int read_mdproto_header(struct serial_session_t *s, struct mdproto_cmd_buf_t *dst)
+{
+	int rcvd, rcvd_total;
+	int i;
+	const TCHAR *err;
+	uint8_t header[2];
+
+	assert(dst);
+
+	rcvd = 0, rcvd_total=0;
+	for (i=0; i<20; ++i) {
+		int rcvd_now;
+		rcvd_now = serial_session_read(s,
+			&header[rcvd],
+			sizeof(header) - rcvd,
+			1000);
+
+		rcvd += rcvd_now;
+		rcvd_total += rcvd_now;
+		if (rcvd < sizeof(header))
+			continue;
+
+		switch (header[0]) {
+			case MDPROTO_STATUS_OK:
+			case MDPROTO_STATUS_WRONG_CMD:
+			case MDPROTO_STATUS_READ_HEADER_TIMEOUT:
+			case MDPROTO_STATUS_READ_DATA_TIMEOUT:
+			case MDPROTO_STATUS_TOO_BIG:
+			case MDPROTO_STATUS_WRONG_CSUM:
+			case MDPROTO_STATUS_WRONG_PARAM:
+				/* skip status */
+				DEBUGMSG(1, (TEXT("skipped status byte '%c'\n"), header[0]));
+				if (rcvd == 1) {
+					rcvd = 0;
+					break;
+				}else {
+					assert(rcvd == 2);
+					rcvd = 1;
+					header[0]=header[1];
+					break;
+				}
+				break;
+			default:
+				assert(sizeof(header)==sizeof(dst->size));
+				memcpy(&dst->size, header, sizeof(header));
+				return 0;
+				break;
+		} /* switch */
+	} /* for (i) */
+
+	err = TEXT("mdproto read header timeout");
+	serial_session_set_error(s, 0, err);
+	logger_error(TEXT("mdproto read header timeout. rcvd: %u"), rcvd);
+	return -1;
+}
+
 static int read_mdproto_pkt(struct serial_session_t *s, struct mdproto_cmd_buf_t *dst)
 {
 	const TCHAR *err;
@@ -499,22 +557,14 @@ static int read_mdproto_pkt(struct serial_session_t *s, struct mdproto_cmd_buf_t
     INT size;
 
 	/* Header */
-	rcvd = serial_session_read(s, &dst->size, sizeof(dst->size), 20 * 1000);
-	if (rcvd < 0)
+	if (read_mdproto_header(s, dst)<0)
 		return -1;
-
-	if (rcvd < sizeof(dst->size)) {
-		err = TEXT("mdproto read header timeout");
-	    serial_session_set_error(s, 0, err);
-		logger_error(TEXT("mdproto read header timeout. rcvd: %u"), rcvd);
-		return -1;
-	}
-
+	
     size = ntohs(dst->size);
 	if (size > sizeof(dst->data.p)) {
 		err = TEXT("mdproto message too big");
 		serial_session_set_error(s, 0, err);
-		logger_error(err);
+		logger_error(TEXT("mdproto message too big (%04x)"), size);
 		return -1;
 	}
 
@@ -1150,6 +1200,7 @@ static int dump_mem(struct serial_session_t *s,
 					)
 {
 	unsigned dst_addr;
+	unsigned rcvd, purged;
 	int write_size;
 	int cur_size;
 	struct mdproto_cmd_buf_t cmd;
@@ -1161,13 +1212,13 @@ static int dump_mem(struct serial_session_t *s,
 	} req;
 #pragma pack(pop)
 
+	PurgeComm(s->port_handle,
+			PURGE_TXABORT | PURGE_RXABORT | PURGE_TXCLEAR | PURGE_RXCLEAR);
+
 	dst_addr = src_addr+size-1;
 	req.src = htonl(src_addr);
 	req.dst = htonl(dst_addr);
 	write_size = mdproto_pkt_init(&cmd, MDPROTO_CMD_MEM_READ, &req, sizeof(req));
-
-	PurgeComm(s->port_handle,
-			PURGE_TXABORT | PURGE_RXABORT | PURGE_TXCLEAR | PURGE_RXCLEAR);
 
 	if (serial_session_write(s, &cmd, write_size) < 0)
 		return -1;
@@ -1343,6 +1394,12 @@ static int get_flash_info(struct serial_session_t *s, struct mdproto_cmd_flash_i
     }
 
 	memcpy(res, &cmd.data.p[1], sizeof(*res));
+/*
+	XXX:
+	if (serial_session_read(s, &cmd.data.p, 1, 100) == 1) {
+		DEBUGMSG(TRUE, ( TEXT("rcvd after flash info: %x"), (unsigned)cmd.data.p[0] ));
+	}
+*/
 	return 0;
 }
 
@@ -1827,8 +1884,10 @@ int switch_gps_mode(struct serial_session_t *s, unsigned current, unsigned requi
 	const TCHAR *err_msg;
 	int res, lock_res;
 
-	if (current == required)
+	if (current == required) {
+		s->proto = required;
 		return 0;
+	}
 
 	if (lock_res = serial_session_mtx_lock(s, INFINITE) < 0)
 		return lock_res;

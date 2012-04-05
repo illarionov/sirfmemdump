@@ -995,6 +995,7 @@ static DWORD WINAPI serial_session_rx_thread(LPVOID s_p)
 				break;
 			case REQUEST_DUMP:
 				memdump_cmd_dump(s);
+				s->request = REQUEST_NONE;
 				break;
 			case REQUEST_GPS_MODE:
 				switch_gps_mode(s, s->req_ctx.gps_mode.from_gps_mode,
