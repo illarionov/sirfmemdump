@@ -1200,7 +1200,6 @@ static int dump_mem(struct serial_session_t *s,
 					)
 {
 	unsigned dst_addr;
-	unsigned rcvd, purged;
 	int write_size;
 	int cur_size;
 	struct mdproto_cmd_buf_t cmd;
