@@ -195,7 +195,7 @@ int main(void)
 	       break;
 	    case MDPROTO_CMD_FLASH_INFO:
 	       {
-		  struct mdproto_cmd_flash_info_t response;
+		  static struct mdproto_cmd_flash_info_t response;
 		  flash_get_info(&response);
 		  write_cmd_response(MDPROTO_CMD_FLASH_INFO_RESPONSE, (void *)&response, sizeof(response));
 	       }
